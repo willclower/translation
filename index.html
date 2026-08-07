@@ -5,125 +5,229 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Document Translation</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
   :root{
-    --navy:#1f2d3d;--blue:#3a6ea5;--accent:#c9772f;--ink:#1a2330;--muted:#5b6b7c;
-    --line:#dfe6ee;--bg:#f4f7fa;--card:#ffffff;--ok:#1f8a5b;--err:#c0392b;--radius:14px;
+    --navy:#1b2a4a; --blue:#2f6fb0; --orange:#e08a1e;
+    --bg:#f7f6f2; --card:#ffffff; --ink:#2a2f38; --muted:#6b7480;
+    --line:#e6e3da; --ok:#1f7a52; --err:#b0402e; --radius:16px;
   }
   *{box-sizing:border-box}
   body{
-    margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
-    background:var(--bg);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased;
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    line-height:1.55;-webkit-font-smoothing:antialiased;
   }
-  .wrap{max-width:640px;margin:0 auto;padding:40px 20px 64px}
-  header{margin-bottom:28px}
-  .kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:6px}
-  h1{font-size:28px;line-height:1.15;margin:0 0 6px;color:var(--navy);font-weight:700}
-  .sub{color:var(--muted);font-size:15px;margin:0}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:26px;box-shadow:0 1px 3px rgba(0,40,85,.05)}
-  .field{margin-bottom:22px}
-  label{display:block;font-weight:600;font-size:14px;margin-bottom:8px;color:var(--navy)}
-  .hint{font-size:12.5px;color:var(--muted);margin-top:6px}
-  .drop{border:2px dashed var(--line);border-radius:12px;padding:26px 20px;text-align:center;cursor:pointer;transition:.15s;background:#fbfdff}
-  .drop:hover,.drop.drag{border-color:var(--blue);background:#f0f6fb}
-  .drop .icon{font-size:26px;color:var(--blue)}
-  .drop .big{font-weight:600;color:var(--navy);margin-top:6px}
-  .drop .small{font-size:12.5px;color:var(--muted);margin-top:2px}
-  .filename{margin-top:12px;font-size:14px;color:var(--navy);font-weight:600;display:none;align-items:center;gap:8px;justify-content:center}
-  .filename.show{display:flex}
-  .clear{color:var(--muted);cursor:pointer;font-weight:400;font-size:13px;text-decoration:underline}
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:18px 32px;border-bottom:1px solid var(--line);background:#fbfaf7;
+  }
+  .brand{font-weight:600;color:var(--blue);font-size:15px;letter-spacing:.01em}
+  .topbar .sub{font-size:12px;color:var(--muted)}
+  .wrap{max-width:940px;margin:0 auto;padding:56px 28px 80px}
+
+  /* hero */
+  .kicker{
+    display:inline-block;font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--blue);font-weight:600;border:1px solid var(--line);
+    border-radius:999px;padding:6px 14px;margin-bottom:22px;background:#fff;
+  }
+  .hero{display:grid;grid-template-columns:1.5fr .8fr;gap:40px;align-items:end;margin-bottom:44px}
+  h1{
+    font-family:'Fraunces',Georgia,serif;font-weight:400;color:var(--navy);
+    font-size:46px;line-height:1.05;margin:0 0 16px;letter-spacing:-.01em;
+  }
+  h1 .accent{display:block;font-style:italic;font-weight:500;color:var(--blue)}
+  .lede{color:var(--muted);font-size:15.5px;max-width:44ch;margin:0}
+  .stats{border-left:2px solid var(--orange);padding-left:18px;display:grid;gap:14px}
+  .stat .l{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  .stat .v{font-family:'Fraunces',serif;font-size:19px;color:var(--navy);font-weight:600}
+
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:30px;box-shadow:0 1px 2px rgba(27,42,74,.04);
+  }
+  .field{margin-bottom:24px}
+  label{display:block;font-weight:600;font-size:13.5px;margin-bottom:9px;color:var(--navy)}
+  .hint{font-size:12.5px;color:var(--muted);margin-top:7px}
+
+  .drop{
+    border:2px dashed var(--line);border-radius:12px;padding:30px 20px;text-align:center;
+    cursor:pointer;transition:.15s;background:#fbfaf7;
+  }
+  .drop:hover,.drop.drag{border-color:var(--blue);background:#f1f6fb}
+  .drop .icon{font-size:24px;color:var(--blue)}
+  .drop .big{font-weight:600;color:var(--navy);margin-top:8px;font-size:15px}
+  .drop .small{font-size:12.5px;color:var(--muted);margin-top:3px}
+
+  .files{margin-top:14px;display:none;flex-direction:column;gap:8px}
+  .files.show{display:flex}
+  .frow{
+    display:flex;align-items:center;gap:12px;padding:11px 14px;border:1px solid var(--line);
+    border-radius:10px;background:#fff;font-size:13.5px;
+  }
+  .frow .nm{font-weight:600;color:var(--navy);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .frow .st{font-size:12px;color:var(--muted);white-space:nowrap}
+  .frow .st.hit{color:var(--ok)}
+  .frow .st.done{color:var(--ok)}
+  .frow .st.err{color:var(--err)}
+  .frow .st.busy{color:var(--blue)}
+  .frow .x{color:var(--muted);cursor:pointer;font-size:16px;line-height:1}
+
   select{
-    width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;font:inherit;color:var(--ink);background:#fff;appearance:none;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%233a6ea5' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+    width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;
+    font:inherit;color:var(--ink);background:#fff;appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath fill='%232f6fb0' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
     background-repeat:no-repeat;background-position:right 14px center;
   }
+  .row2{display:grid;grid-template-columns:1fr 1.4fr;gap:18px}
   .segs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
-  .seg{border:1px solid var(--line);border-radius:10px;padding:12px 10px;text-align:center;cursor:pointer;transition:.12s;background:#fff}
+  .seg{border:1px solid var(--line);border-radius:10px;padding:11px 8px;text-align:center;cursor:pointer;transition:.12s;background:#fff}
   .seg:hover{border-color:var(--blue)}
-  .seg.active{border-color:var(--accent);background:#fdf6ef;box-shadow:0 0 0 1px var(--accent) inset}
-  .seg .t{font-weight:600;font-size:14px;color:var(--navy)}
-  .seg .d{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.3}
-  button.go{width:100%;border:0;border-radius:10px;padding:15px;font:inherit;font-weight:600;font-size:15px;color:#fff;background:var(--navy);cursor:pointer;transition:.15s}
-  button.go:hover{background:#2a3f56}
-  button.go:disabled{background:#9fb1c4;cursor:not-allowed}
-  .status{margin-top:18px;font-size:14px;display:none}
-  .status.show{display:block}
-  .status.busy{color:var(--blue)}
-  .status.ok{color:var(--ok)}
-  .status.err{color:var(--err)}
-  .spinner{display:inline-block;width:14px;height:14px;border:2px solid #cfe0ee;border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;vertical-align:-2px;margin-right:7px}
-  @keyframes spin{to{transform:rotate(360deg)}}
-  .notice{margin-top:16px;font-size:12px;color:var(--muted);background:#f7fafd;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
-  .footer{margin-top:26px;text-align:center;font-size:12px;color:var(--muted)}
+  .seg.active{border-color:var(--orange);background:#fef7ec;box-shadow:0 0 0 1px var(--orange) inset}
+  .seg .t{font-weight:600;font-size:13.5px;color:var(--navy)}
+  .seg .d{font-size:11px;color:var(--muted);margin-top:2px}
+
+  button.go{
+    width:100%;border:0;border-radius:11px;padding:15px;font:inherit;font-weight:600;
+    font-size:15px;color:#fff;background:var(--navy);cursor:pointer;transition:.15s;margin-top:4px;
+  }
+  button.go:hover{background:#233763}
+  button.go:disabled{background:#a9b2c0;cursor:not-allowed}
+  .notice{margin-top:16px;font-size:12px;color:var(--muted);background:#fbfaf7;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+
+  /* library */
+  .lib{margin-top:44px}
+  .lib h2{font-family:'Fraunces',serif;font-weight:600;color:var(--navy);font-size:22px;margin:0 0 4px}
+  .lib .sub{font-size:13px;color:var(--muted);margin:0 0 18px}
+  .libgrid{display:grid;gap:12px}
+  .lrow{
+    display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;
+    padding:16px 18px;border:1px solid var(--line);border-radius:12px;background:#fff;
+  }
+  .lrow .desc{font-weight:600;color:var(--navy);font-size:14px;margin-bottom:5px}
+  .lrow .meta{font-size:12px;color:var(--muted)}
+  .lrow .tags{margin-top:7px;display:flex;gap:6px;flex-wrap:wrap}
+  .tag{font-size:10.5px;letter-spacing:.03em;color:var(--blue);background:#eef4fb;border-radius:999px;padding:3px 9px}
+  .lrow .dl{border:1px solid var(--line);background:#fff;color:var(--navy);font:inherit;font-weight:600;font-size:12.5px;padding:9px 14px;border-radius:9px;cursor:pointer;white-space:nowrap}
+  .lrow .dl:hover{border-color:var(--blue);color:var(--blue)}
+  .libempty{padding:26px;text-align:center;color:var(--muted);font-size:13.5px;border:1px dashed var(--line);border-radius:12px}
+
+  .footer{margin-top:56px;padding-top:22px;border-top:1px solid var(--line);display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+  .footer .mw{font-style:italic;color:var(--orange)}
+
+  @media(max-width:720px){
+    .hero{grid-template-columns:1fr;gap:24px}
+    h1{font-size:36px}.row2{grid-template-columns:1fr}
+    .stats{border-left:0;border-top:2px solid var(--orange);padding-left:0;padding-top:16px}
+  }
 </style>
 </head>
 <body>
+<div class="topbar">
+  <div class="brand" id="brandName">Wellness Tools</div>
+  <div class="sub">Document Translation</div>
+</div>
+
 <div class="wrap">
-  <header>
-    <div class="kicker">Wellness Tools</div>
-    <h1>Document Translation</h1>
-    <p class="sub">Upload a document, choose a style, and get a translated copy back &mdash; with the original layout intact.</p>
-  </header>
+  <div class="kicker">Translation Studio</div>
+  <div class="hero">
+    <div>
+      <h1>Say it once,<span class="accent">say it in every language.</span></h1>
+      <p class="lede">Upload a Word document, choose a language and a style, and get a faithful translation back &mdash; layout, tables, and formatting fully intact. Once a document is translated, it&rsquo;s saved to your library so no one has to do it twice.</p>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="l">Formats</div><div class="v">Word (.docx)</div></div>
+      <div class="stat"><div class="l">Styles</div><div class="v">Plain &middot; Business &middot; Warm</div></div>
+      <div class="stat"><div class="l">Library</div><div class="v" id="libCount">&mdash;</div></div>
+    </div>
+  </div>
 
   <div class="card">
     <div class="field">
-      <label>Document</label>
+      <label>Documents</label>
       <div class="drop" id="drop">
         <div class="icon">&#8593;</div>
-        <div class="big">Drop a file here, or click to browse</div>
-        <div class="small">Word (.docx) supported &middot; other formats coming soon</div>
+        <div class="big">Drop files here, or click to browse</div>
+        <div class="small">Word (.docx) &middot; add several at once for batch translation</div>
       </div>
-      <input type="file" id="file" accept=".docx" hidden>
-      <div class="filename" id="fname"><span id="fnameText"></span><span class="clear" id="clear">remove</span></div>
+      <input type="file" id="file" accept=".docx" multiple hidden>
+      <div class="files" id="files"></div>
     </div>
 
-    <div class="field">
-      <label for="lang">Translate into</label>
-      <select id="lang">
-        <option value="Spanish" selected>Spanish</option>
-        <option value="French">French</option>
-        <option value="Portuguese">Portuguese</option>
-        <option value="Vietnamese">Vietnamese</option>
-        <option value="Chinese (Simplified)">Chinese (Simplified)</option>
-      </select>
-    </div>
-
-    <div class="field">
-      <label>Document style</label>
-      <div class="segs" id="segs">
-        <div class="seg" data-reg="basic"><div class="t">Plain</div><div class="d">Clear &amp; literal</div></div>
-        <div class="seg active" data-reg="business"><div class="t">Business</div><div class="d">Formal &amp; precise</div></div>
-        <div class="seg" data-reg="conversational"><div class="t">Conversational</div><div class="d">Warm &amp; direct</div></div>
+    <div class="row2">
+      <div class="field" style="margin-bottom:0">
+        <label for="lang">Translate into</label>
+        <select id="lang">
+          <option value="Spanish" selected>Spanish</option>
+          <option value="French">French</option>
+          <option value="Portuguese">Portuguese</option>
+          <option value="Vietnamese">Vietnamese</option>
+          <option value="Chinese (Simplified)">Chinese (Simplified)</option>
+        </select>
       </div>
-      <div class="hint">This tells the translator what tone to use &mdash; formal for policies, conversational for worker-facing notices.</div>
+      <div class="field" style="margin-bottom:0">
+        <label>Style</label>
+        <div class="segs" id="segs">
+          <div class="seg" data-reg="basic"><div class="t">Plain</div><div class="d">Clear &amp; literal</div></div>
+          <div class="seg active" data-reg="business"><div class="t">Business</div><div class="d">Formal &amp; precise</div></div>
+          <div class="seg" data-reg="conversational"><div class="t">Warm</div><div class="d">Direct &amp; friendly</div></div>
+        </div>
+      </div>
     </div>
 
-    <button class="go" id="go" disabled>Translate document</button>
-    <div class="status" id="status"></div>
-    <div class="notice">For general and program documents. Do not upload documents containing an individual's personal health information.</div>
+    <div style="height:22px"></div>
+    <button class="go" id="go" disabled>Translate</button>
+    <div class="notice">For general and program documents. Do not upload documents containing an individual&rsquo;s personal health information.</div>
   </div>
 
-  <div class="footer">Document Translation Tool</div>
+  <div class="lib">
+    <h2>Your translation library</h2>
+    <p class="sub">Everything your organization has already translated. Reused automatically when the same document comes through again.</p>
+    <div class="libgrid" id="libgrid"><div class="libempty">Loading&hellip;</div></div>
+  </div>
+
+  <div class="footer">
+    <div>This tool is powered by <span class="mw">Mediterranean Wellness</span> &mdash; clinical integration technology for population health.</div>
+    <div id="footRight">&nbsp;</div>
+  </div>
 </div>
 
 <script>
-  // ====== CONFIG — set to the n8n JSON webhook URL ======
-  const WEBHOOK_URL = "https://n8n-admin.willclower.com/webhook/translate-doc";
-  // ======================================================
+  // ===== CONFIG =====
+  const HOST = "https://n8n-admin.willclower.com/webhook";
+  const EP = {
+    translate: HOST + "/translate-doc",
+    check:     HOST + "/translate-check",
+    store:     HOST + "/translate-store",
+    library:   HOST + "/translate-library",   // browse (built next)
+    fetch:     HOST + "/translate-fetch"      // download stored (built next)
+  };
+  // Tenant identity. On the white-labeled admin these are injected server-side;
+  // hardcoded here for the test page. (For prod, company_id MUST be trusted, not client-set.)
+  const COMPANY_ID = "100";
+  const USER_ID = "4";
+  const SOURCE_LANG = "English";
+  const GLOSSARY_VERSION = null;
+  // ==================
+
+  const LANG_CODE = { 'Spanish':'ES','French':'FR','Portuguese':'PT','Vietnamese':'VI','Chinese (Simplified)':'ZH' };
 
   const fileInput = document.getElementById('file');
   const drop = document.getElementById('drop');
-  const fname = document.getElementById('fname');
-  const fnameText = document.getElementById('fnameText');
-  const clearBtn = document.getElementById('clear');
+  const filesBox = document.getElementById('files');
   const go = document.getElementById('go');
-  const status = document.getElementById('status');
   const segs = document.getElementById('segs');
   const langSel = document.getElementById('lang');
+  const libgrid = document.getElementById('libgrid');
+  const libCount = document.getElementById('libCount');
   let register = 'business';
+  let queue = []; // {file, id, statusEl}
 
   segs.addEventListener('click', function(e){
-    var seg = e.target.closest('.seg'); if (!seg) return;
+    var seg = e.target.closest('.seg'); if(!seg) return;
     [].forEach.call(segs.children, function(s){ s.classList.remove('active'); });
     seg.classList.add('active'); register = seg.dataset.reg;
   });
@@ -131,94 +235,177 @@
   drop.addEventListener('click', function(){ fileInput.click(); });
   drop.addEventListener('dragover', function(e){ e.preventDefault(); drop.classList.add('drag'); });
   drop.addEventListener('dragleave', function(){ drop.classList.remove('drag'); });
-  drop.addEventListener('drop', function(e){ e.preventDefault(); drop.classList.remove('drag'); if (e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]); });
-  fileInput.addEventListener('change', function(){ if (fileInput.files.length) setFile(fileInput.files[0]); });
-  clearBtn.addEventListener('click', function(){ fileInput.value=''; fname.classList.remove('show'); go.disabled=true; hideStatus(); chosenFile=null; });
+  drop.addEventListener('drop', function(e){ e.preventDefault(); drop.classList.remove('drag'); addFiles(e.dataTransfer.files); });
+  fileInput.addEventListener('change', function(){ addFiles(fileInput.files); });
 
-  var chosenFile = null;
-  function setFile(f){
-    if (!f.name.toLowerCase().endsWith('.docx')) { showStatus('err','Please choose a Word (.docx) file.'); return; }
-    chosenFile = f; fnameText.textContent = f.name; fname.classList.add('show'); go.disabled = false; hideStatus();
+  function addFiles(list){
+    for (var i=0;i<list.length;i++){
+      var f = list[i];
+      if (!f.name.toLowerCase().endsWith('.docx')) continue;
+      if (queue.some(function(q){ return q.file.name===f.name && q.file.size===f.size; })) continue;
+      queue.push({ file:f, id:'q'+Date.now()+i, statusEl:null });
+    }
+    renderQueue();
   }
-  function showStatus(kind, html){ status.className = 'status show ' + kind; status.innerHTML = html; }
-  function hideStatus(){ status.className = 'status'; }
+  function renderQueue(){
+    filesBox.innerHTML='';
+    queue.forEach(function(q){
+      var row=document.createElement('div'); row.className='frow';
+      var nm=document.createElement('div'); nm.className='nm'; nm.textContent=q.file.name;
+      var st=document.createElement('div'); st.className='st'; st.textContent='ready';
+      var x=document.createElement('div'); x.className='x'; x.textContent='\u00d7';
+      x.onclick=function(){ queue=queue.filter(function(z){return z.id!==q.id;}); renderQueue(); };
+      row.appendChild(nm); row.appendChild(st); row.appendChild(x);
+      filesBox.appendChild(row); q.statusEl=st;
+    });
+    filesBox.classList.toggle('show', queue.length>0);
+    go.disabled = queue.length===0;
+    go.textContent = queue.length>1 ? ('Translate '+queue.length+' documents') : 'Translate';
+  }
+  function setStatus(q, kind, txt){ if(!q.statusEl) return; q.statusEl.className='st '+kind; q.statusEl.textContent=txt; }
 
-  var DOC_RE = /^word\/(document|header\d*|footer\d*)\.xml$/;
-  function xmlDecode(s){ return s.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,'&'); }
-  function xmlEncode(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  // ---- docx helpers ----
+  var DOC_RE=/^word\/(document|header\d*|footer\d*)\.xml$/;
+  function xmlDecode(s){return s.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,'&');}
+  function xmlEncode(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  async function sha256hex(buf){
+    var h=await crypto.subtle.digest('SHA-256', buf);
+    return Array.prototype.map.call(new Uint8Array(h),function(b){return b.toString(16).padStart(2,'0');}).join('');
+  }
+  function bufToB64(buf){
+    var bytes=new Uint8Array(buf), bin=''; for(var i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  }
+  async function blobToB64(blob){ return bufToB64(await blob.arrayBuffer()); }
 
   async function extract(zip){
-    var strings = []; var parts = {}; var g = 0;
-    var names = Object.keys(zip.files).filter(function(n){ return DOC_RE.test(n); });
+    var strings=[],parts={},g=0;
+    var names=Object.keys(zip.files).filter(function(n){return DOC_RE.test(n);});
     for (var k=0;k<names.length;k++){
-      var name = names[k];
-      var xml = await zip.file(name).async('string');
-      var slots = []; var re = /(<w:t(?:\s[^>]*)?>)([\s\S]*?)(<\/w:t>)/g; var m;
-      while ((m = re.exec(xml)) !== null){
-        var start = m.index + m[1].length; var end = start + m[2].length;
-        strings.push(xmlDecode(m[2])); slots.push({ start: start, end: end, idx: g++ });
-      }
-      parts[name] = { xml: xml, slots: slots };
+      var xml=await zip.file(names[k]).async('string');
+      var slots=[],re=/(<w:t(?:\s[^>]*)?>)([\s\S]*?)(<\/w:t>)/g,m;
+      while((m=re.exec(xml))!==null){var s=m.index+m[1].length;strings.push(xmlDecode(m[2]));slots.push({start:s,end:s+m[2].length,idx:g++});}
+      parts[names[k]]={xml:xml,slots:slots};
     }
-    return { strings: strings, parts: parts };
+    return {strings:strings,parts:parts};
   }
-  async function rebuild(zip, parts, translated){
-    var names = Object.keys(parts);
-    for (var k=0;k<names.length;k++){
-      var name = names[k];
-      var xml = parts[name].xml;
-      var slots = parts[name].slots.slice().sort(function(a,b){ return b.start - a.start; });
-      for (var i=0;i<slots.length;i++){
-        var s = slots[i]; var t = translated[s.idx];
-        xml = xml.slice(0,s.start) + xmlEncode(t==null?'':String(t)) + xml.slice(s.end);
-      }
-      zip.file(name, xml);
+  async function rebuild(zip,parts,translated){
+    var names=Object.keys(parts);
+    for(var k=0;k<names.length;k++){
+      var xml=parts[names[k]].xml, slots=parts[names[k]].slots.slice().sort(function(a,b){return b.start-a.start;});
+      for(var i=0;i<slots.length;i++){var s=slots[i],t=translated[s.idx];xml=xml.slice(0,s.start)+xmlEncode(t==null?'':String(t))+xml.slice(s.end);}
+      zip.file(names[k],xml);
     }
-    return zip.generateAsync({ type:'blob', compression:'DEFLATE' });
+    return zip.generateAsync({type:'blob',compression:'DEFLATE'});
+  }
+  function download(blob, name){
+    var url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+  }
+  function outName(srcName, lang){ return srcName.replace(/\.docx$/i,'') + '_' + (LANG_CODE[lang]||'TR') + '.docx'; }
+
+  // ---- per-file pipeline: hash -> check -> (reuse | translate -> store) ----
+  async function processOne(q){
+    var f=q.file, lang=langSel.value;
+    try{
+      setStatus(q,'busy','hashing\u2026');
+      var srcBuf=await f.arrayBuffer();
+      var hash=await sha256hex(srcBuf);
+
+      setStatus(q,'busy','checking library\u2026');
+      var chk=await postJSON(EP.check,{company_id:COMPANY_ID,source_sha256:hash,target_lang:lang,register:register});
+      if (chk && chk.hit){
+        setStatus(q,'busy','reusing saved\u2026');
+        var blob=await postForBlob(EP.fetch,{company_id:COMPANY_ID,translation_id:chk.translation_id});
+        download(blob, outName(f.name,lang));
+        setStatus(q,'hit','reused from library \u2193');
+        return;
+      }
+
+      setStatus(q,'busy','reading\u2026');
+      var zip=await JSZip.loadAsync(srcBuf);
+      var ex=await extract(zip);
+      if(!ex.strings.length) throw new Error('no text found');
+
+      setStatus(q,'busy','translating '+ex.strings.length+'\u2026');
+      var tr=await postJSON(EP.translate,{language:lang,register:register,strings:ex.strings});
+      var translated=(tr&&tr.translated)||tr;
+      if(!Array.isArray(translated)||translated.length!==ex.strings.length) throw new Error('translation mismatch');
+
+      setStatus(q,'busy','rebuilding\u2026');
+      var blob=await rebuild(zip,ex.parts,translated);
+      download(blob, outName(f.name,lang));
+
+      setStatus(q,'busy','saving to library\u2026');
+      var srcB64=bufToB64(srcBuf), outB64=await blobToB64(blob);
+      await postJSON(EP.store,{
+        company_id:COMPANY_ID,uploader_user_id:USER_ID,source_filename:f.name,
+        source_sha256:hash,source_lang:SOURCE_LANG,target_lang:lang,register:register,
+        glossary_version:GLOSSARY_VERSION,string_count:ex.strings.length,
+        strings_sample:ex.strings.slice(0,25),source_b64:srcB64,translated_b64:outB64
+      });
+      setStatus(q,'done','translated \u2193');
+    }catch(err){
+      setStatus(q,'err', err.message||'failed');
+    }
+  }
+
+  async function postJSON(url, body){
+    var res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!res.ok) throw new Error('server '+res.status);
+    return res.json();
+  }
+  async function postForBlob(url, body){
+    var res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!res.ok) throw new Error('server '+res.status);
+    return res.blob();
   }
 
   go.addEventListener('click', async function(){
-    if (!chosenFile) return;
-    go.disabled = true;
-    showStatus('busy','<span class="spinner"></span>Reading document&hellip;');
-    try {
-      var buf = await chosenFile.arrayBuffer();
-      var zip = await JSZip.loadAsync(buf);
-      var ex = await extract(zip);
-      if (!ex.strings.length) throw new Error('No translatable text found in this document.');
-
-      showStatus('busy','<span class="spinner"></span>Translating '+ex.strings.length+' text segments&hellip; this can take up to a minute.');
-      var res = await fetch(WEBHOOK_URL, {
-        method:'POST',
-        headers:{ 'Content-Type':'application/json' },
-        body: JSON.stringify({ language: langSel.value, register: register, strings: ex.strings })
-      });
-      if (!res.ok){
-        var msg = 'Server returned ' + res.status;
-        try { var j = await res.json(); if (j && j.error) msg = j.error; } catch(_){}
-        throw new Error(msg);
-      }
-      var data = await res.json();
-      var translated = data.translated || data;
-      if (!Array.isArray(translated)) throw new Error('Unexpected response from translator.');
-      if (translated.length !== ex.strings.length) throw new Error('Translation count mismatch ('+ex.strings.length+' sent, '+translated.length+' back).');
-
-      showStatus('busy','<span class="spinner"></span>Rebuilding document&hellip;');
-      var blob = await rebuild(zip, ex.parts, translated);
-
-      var base = chosenFile.name.replace(/\.docx$/i,'');
-      var code = { 'Spanish':'ES','French':'FR','Portuguese':'PT','Vietnamese':'VI','Chinese (Simplified)':'ZH' }[langSel.value] || 'TR';
-      var outName = base + '_' + code + '.docx';
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a'); a.href = url; a.download = outName; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-
-      showStatus('ok','&#10003; Done &mdash; translated document downloaded as <b>'+outName+'</b>.');
-    } catch (err){
-      showStatus('err','&#9888; '+err.message+' Please try again.');
-    } finally {
-      go.disabled = false;
-    }
+    go.disabled=true;
+    for (var i=0;i<queue.length;i++){ await processOne(queue[i]); }
+    go.disabled=false;
+    loadLibrary();
   });
+
+  // ---- library panel ----
+  async function loadLibrary(){
+    try{
+      var rows=await postJSON(EP.library,{company_id:COMPANY_ID});
+      var list=Array.isArray(rows)?rows:(rows.items||[]);
+      libCount.textContent = list.length + (list.length===1?' document':' documents');
+      if(!list.length){ libgrid.innerHTML='<div class="libempty">Nothing translated yet. Your first document will appear here.</div>'; return; }
+      libgrid.innerHTML='';
+      list.forEach(function(r){
+        var row=document.createElement('div'); row.className='lrow';
+        var left=document.createElement('div');
+        var d=document.createElement('div'); d.className='desc'; d.textContent=r.description||r.source_filename||'Translated document';
+        var meta=document.createElement('div'); meta.className='meta';
+        var when=r.created_at?new Date(r.created_at).toLocaleDateString():'';
+        meta.textContent=[r.source_filename, (r.target_lang||'')+' \u00b7 '+cap(r.register||''), when].filter(Boolean).join('  \u2014  ');
+        left.appendChild(d); left.appendChild(meta);
+        if(Array.isArray(r.tags)&&r.tags.length){
+          var tg=document.createElement('div'); tg.className='tags';
+          r.tags.forEach(function(t){var s=document.createElement('span');s.className='tag';s.textContent=t;tg.appendChild(s);});
+          left.appendChild(tg);
+        }
+        var dl=document.createElement('button'); dl.className='dl'; dl.textContent='Download';
+        dl.onclick=async function(){
+          dl.textContent='\u2026';
+          try{ var blob=await postForBlob(EP.fetch,{company_id:COMPANY_ID,translation_id:r.translation_id});
+            download(blob,(r.source_filename||'document').replace(/\.docx$/i,'')+'_'+(LANG_CODE[r.target_lang]||'TR')+'.docx');
+          }catch(e){} dl.textContent='Download';
+        };
+        row.appendChild(left); row.appendChild(dl); libgrid.appendChild(row);
+      });
+    }catch(err){
+      libgrid.innerHTML='<div class="libempty">Library will appear here once the browse endpoint is live.</div>';
+      libCount.textContent='\u2014';
+    }
+  }
+  function cap(s){return s?s.charAt(0).toUpperCase()+s.slice(1):s;}
+
+  loadLibrary();
 </script>
 </body>
 </html>
