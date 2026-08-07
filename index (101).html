@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Document Translation</title>
+<style>
+  /* ---- Neutral palette. Per-client branding is injected on the admin side. ---- */
+  :root{
+    --navy:#1f2d3d;
+    --blue:#3a6ea5;
+    --accent:#c9772f;
+    --ink:#1a2330;
+    --muted:#5b6b7c;
+    --line:#dfe6ee;
+    --bg:#f4f7fa;
+    --card:#ffffff;
+    --ok:#1f8a5b;
+    --err:#c0392b;
+    --radius:14px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',
+    Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--ink);line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:640px;margin:0 auto;padding:40px 20px 64px}
+  header{margin-bottom:28px}
+  .kicker{
+    font-size:12px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);font-weight:600;margin-bottom:6px;
+  }
+  h1{font-size:28px;line-height:1.15;margin:0 0 6px;color:var(--navy);font-weight:700}
+  .sub{color:var(--muted);font-size:15px;margin:0}
+  .card{
+    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+    padding:26px;box-shadow:0 1px 3px rgba(0,40,85,.05);
+  }
+  .field{margin-bottom:22px}
+  label{display:block;font-weight:600;font-size:14px;margin-bottom:8px;color:var(--navy)}
+  .hint{font-size:12.5px;color:var(--muted);margin-top:6px}
+  .drop{
+    border:2px dashed var(--line);border-radius:12px;padding:26px 20px;text-align:center;
+    cursor:pointer;transition:.15s;background:#fbfdff;
+  }
+  .drop:hover,.drop.drag{border-color:var(--blue);background:#f0f6fb}
+  .drop .icon{font-size:26px;color:var(--blue)}
+  .drop .big{font-weight:600;color:var(--navy);margin-top:6px}
+  .drop .small{font-size:12.5px;color:var(--muted);margin-top:2px}
+  .filename{
+    margin-top:12px;font-size:14px;color:var(--navy);font-weight:600;
+    display:none;align-items:center;gap:8px;justify-content:center;
+  }
+  .filename.show{display:flex}
+  .clear{color:var(--muted);cursor:pointer;font-weight:400;font-size:13px;text-decoration:underline}
+  select{
+    width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;
+    font:inherit;color:var(--ink);background:#fff;appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%233a6ea5' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 14px center;
+  }
+  .segs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .seg{
+    border:1px solid var(--line);border-radius:10px;padding:12px 10px;text-align:center;
+    cursor:pointer;transition:.12s;background:#fff;
+  }
+  .seg:hover{border-color:var(--blue)}
+  .seg.active{border-color:var(--accent);background:#fdf6ef;box-shadow:0 0 0 1px var(--accent) inset}
+  .seg .t{font-weight:600;font-size:14px;color:var(--navy)}
+  .seg .d{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.3}
+  button.go{
+    width:100%;border:0;border-radius:10px;padding:15px;font:inherit;font-weight:600;
+    font-size:15px;color:#fff;background:var(--navy);cursor:pointer;transition:.15s;
+  }
+  button.go:hover{background:#2a3f56}
+  button.go:disabled{background:#9fb1c4;cursor:not-allowed}
+  .status{margin-top:18px;font-size:14px;display:none}
+  .status.show{display:block}
+  .status.busy{color:var(--blue)}
+  .status.ok{color:var(--ok)}
+  .status.err{color:var(--err)}
+  .spinner{
+    display:inline-block;width:14px;height:14px;border:2px solid #cfe0ee;
+    border-top-color:var(--blue);border-radius:50%;animation:spin .7s linear infinite;
+    vertical-align:-2px;margin-right:7px;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .notice{
+    margin-top:16px;font-size:12px;color:var(--muted);background:#f7fafd;
+    border:1px solid var(--line);border-radius:8px;padding:10px 12px;
+  }
+  .footer{margin-top:26px;text-align:center;font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="kicker">Wellness Tools</div>
+    <h1>Document Translation</h1>
+    <p class="sub">Upload a document, choose a style, and get a translated copy back — with the original layout intact.</p>
+  </header>
+
+  <div class="card">
+    <div class="field">
+      <label>Document</label>
+      <div class="drop" id="drop">
+        <div class="icon">&#8593;</div>
+        <div class="big">Drop a file here, or click to browse</div>
+        <div class="small">Word (.docx) supported &middot; other formats coming soon</div>
+      </div>
+      <input type="file" id="file" accept=".docx" hidden>
+      <div class="filename" id="fname">
+        <span id="fnameText"></span>
+        <span class="clear" id="clear">remove</span>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="lang">Translate into</label>
+      <select id="lang">
+        <option value="Spanish" selected>Spanish</option>
+        <option value="French">French</option>
+        <option value="Portuguese">Portuguese</option>
+        <option value="Vietnamese">Vietnamese</option>
+        <option value="Chinese (Simplified)">Chinese (Simplified)</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Document style</label>
+      <div class="segs" id="segs">
+        <div class="seg" data-reg="basic">
+          <div class="t">Plain</div>
+          <div class="d">Clear &amp; literal</div>
+        </div>
+        <div class="seg active" data-reg="business">
+          <div class="t">Business</div>
+          <div class="d">Formal &amp; precise</div>
+        </div>
+        <div class="seg" data-reg="conversational">
+          <div class="t">Conversational</div>
+          <div class="d">Warm &amp; direct</div>
+        </div>
+      </div>
+      <div class="hint">This tells the translator what tone to use — formal for policies, conversational for worker-facing notices.</div>
+    </div>
+
+    <button class="go" id="go" disabled>Translate document</button>
+
+    <div class="status" id="status"></div>
+
+    <div class="notice">For general and program documents. Do not upload documents containing an individual's personal health information.</div>
+  </div>
+
+  <div class="footer">Document Translation Tool</div>
+</div>
+
+<script>
+  // ====== CONFIG — set this to the n8n webhook URL (test first, then production) ======
+  const WEBHOOK_URL = "https://YOUR-N8N-HOST/webhook/translate-doc";
+  // ===================================================================================
+
+  const fileInput = document.getElementById('file');
+  const drop      = document.getElementById('drop');
+  const fname     = document.getElementById('fname');
+  const fnameText = document.getElementById('fnameText');
+  const clearBtn  = document.getElementById('clear');
+  const go        = document.getElementById('go');
+  const status    = document.getElementById('status');
+  const segs      = document.getElementById('segs');
+  const langSel   = document.getElementById('lang');
+  let register    = 'business';
+
+  segs.addEventListener('click', e => {
+    const seg = e.target.closest('.seg');
+    if (!seg) return;
+    [...segs.children].forEach(s => s.classList.remove('active'));
+    seg.classList.add('active');
+    register = seg.dataset.reg;
+  });
+
+  drop.addEventListener('click', () => fileInput.click());
+  drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('drag'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('drag'));
+  drop.addEventListener('drop', e => {
+    e.preventDefault(); drop.classList.remove('drag');
+    if (e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files.length) setFile(fileInput.files[0]);
+  });
+  clearBtn.addEventListener('click', () => {
+    fileInput.value = ''; fname.classList.remove('show');
+    go.disabled = true; hideStatus();
+  });
+
+  function setFile(f){
+    if (!f.name.toLowerCase().endsWith('.docx')) {
+      showStatus('err', 'Please choose a Word (.docx) file.');
+      return;
+    }
+    fnameText.textContent = f.name;
+    fname.classList.add('show');
+    go.disabled = false;
+    hideStatus();
+    const dt = new DataTransfer(); dt.items.add(f); fileInput.files = dt.files;
+  }
+
+  function showStatus(kind, html){
+    status.className = 'status show ' + kind;
+    status.innerHTML = html;
+  }
+  function hideStatus(){ status.className = 'status'; }
+
+  go.addEventListener('click', async () => {
+    const file = fileInput.files[0];
+    if (!file) return;
+    go.disabled = true;
+    showStatus('busy', '<span class="spinner"></span>Translating&hellip; this can take up to a minute for longer documents.');
+
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('language', langSel.value);
+    fd.append('register', register);
+
+    try {
+      const res = await fetch(WEBHOOK_URL, { method:'POST', body: fd });
+      if (!res.ok) {
+        let msg = 'Server returned ' + res.status;
+        try { const j = await res.json(); if (j && j.error) msg = j.error; } catch(_){}
+        throw new Error(msg);
+      }
+      const blob = await res.blob();
+      const base = file.name.replace(/\.docx$/i,'');
+      const code = { 'Spanish':'ES','French':'FR','Portuguese':'PT',
+                     'Vietnamese':'VI','Chinese (Simplified)':'ZH' }[langSel.value] || 'TR';
+      const outName = base + '_' + code + '.docx';
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = outName; document.body.appendChild(a); a.click();
+      a.remove(); URL.revokeObjectURL(url);
+
+      showStatus('ok', '&#10003; Done — your translated document downloaded as <b>'+outName+'</b>.');
+    } catch (err) {
+      showStatus('err', '&#9888; Something went wrong: ' + err.message + '. Please try again.');
+    } finally {
+      go.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
