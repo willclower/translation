@@ -113,6 +113,14 @@
   .tag{font-size:10.5px;letter-spacing:.03em;color:var(--blue);background:#eef4fb;border-radius:999px;padding:3px 9px}
   .lrow .dl{border:1px solid var(--line);background:#fff;color:var(--navy);font:inherit;font-weight:600;font-size:12.5px;padding:9px 14px;border-radius:9px;cursor:pointer;white-space:nowrap}
   .lrow .dl:hover{border-color:var(--blue);color:var(--blue)}
+  .lrow .acts{display:flex;gap:8px;align-items:center}
+  .lrow .del{border:1px solid var(--line);background:#fff;color:var(--muted);font:inherit;font-weight:600;font-size:12.5px;padding:9px 12px;border-radius:9px;cursor:pointer;white-space:nowrap}
+  .lrow .del:hover{border-color:#c0392b;color:#c0392b}
+  .libsearch{display:flex;gap:8px;align-items:center;margin:0 0 14px}
+  .libsearch input{flex:1;border:1px solid var(--line);border-radius:9px;padding:10px 13px;font:inherit;font-size:13.5px;color:var(--navy);background:#fff}
+  .libsearch input:focus{outline:none;border-color:var(--blue)}
+  .libsearch .clr{border:1px solid var(--line);background:#fff;color:var(--muted);font:inherit;font-size:12.5px;padding:10px 13px;border-radius:9px;cursor:pointer}
+  .libsearch .clr:hover{border-color:var(--blue);color:var(--blue)}
   .libempty{padding:26px;text-align:center;color:var(--muted);font-size:13.5px;border:1px dashed var(--line);border-radius:12px}
 
   .footer{margin-top:56px;padding-top:22px;border-top:1px solid var(--line);display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
@@ -186,6 +194,10 @@
   <div class="lib">
     <h2>Your translation library</h2>
     <p class="sub">Everything your organization has already translated. Reused automatically when the same document comes through again.</p>
+    <div class="libsearch">
+      <input type="text" id="libSearch" placeholder="Search by document name or description&hellip;" autocomplete="off">
+      <button class="clr" id="libClear" type="button">Clear</button>
+    </div>
     <div class="libgrid" id="libgrid"><div class="libempty">Loading&hellip;</div></div>
   </div>
 
@@ -203,7 +215,8 @@
     check:     HOST + "/translate-check",
     store:     HOST + "/translate-store",
     library:   HOST + "/translate-library",   // browse (built next)
-    fetch:     HOST + "/translate-fetch"      // download stored (built next)
+    fetch:     HOST + "/translate-fetch",      // download stored (built next)
+    del:       HOST + "/translate-delete"      // soft-delete a library row
   };
   // Tenant identity. On the white-labeled admin these are injected server-side;
   // hardcoded here for the test page. (For prod, company_id MUST be trusted, not client-set.)
@@ -223,6 +236,8 @@
   const langSel = document.getElementById('lang');
   const libgrid = document.getElementById('libgrid');
   const libCount = document.getElementById('libCount');
+  const libSearch = document.getElementById('libSearch');
+  const libClear = document.getElementById('libClear');
   let register = 'business';
   let queue = []; // {file, id, statusEl}
 
@@ -370,11 +385,20 @@
 
   // ---- library panel ----
   async function loadLibrary(){
+    var q = (libSearch && libSearch.value || '').trim();
     try{
-      var rows=await postJSON(EP.library,{company_id:COMPANY_ID});
+      var body={company_id:COMPANY_ID};
+      if(q) body.q=q;
+      var rows=await postJSON(EP.library, body);
       var list=Array.isArray(rows)?rows:(rows.items||[]);
+      // Count reflects the current view; only label as total when unfiltered.
       libCount.textContent = list.length + (list.length===1?' document':' documents');
-      if(!list.length){ libgrid.innerHTML='<div class="libempty">Nothing translated yet. Your first document will appear here.</div>'; return; }
+      if(!list.length){
+        libgrid.innerHTML = q
+          ? '<div class="libempty">No documents match \u201c'+escHtml(q)+'\u201d.</div>'
+          : '<div class="libempty">Nothing translated yet. Your first document will appear here.</div>';
+        return;
+      }
       libgrid.innerHTML='';
       list.forEach(function(r){
         var row=document.createElement('div'); row.className='lrow';
@@ -389,6 +413,9 @@
           r.tags.forEach(function(t){var s=document.createElement('span');s.className='tag';s.textContent=t;tg.appendChild(s);});
           left.appendChild(tg);
         }
+
+        var acts=document.createElement('div'); acts.className='acts';
+
         var dl=document.createElement('button'); dl.className='dl'; dl.textContent='Download';
         dl.onclick=async function(){
           dl.textContent='\u2026';
@@ -396,13 +423,38 @@
             download(blob,(r.source_filename||'document').replace(/\.docx$/i,'')+'_'+(LANG_CODE[r.target_lang]||'TR')+'.docx');
           }catch(e){} dl.textContent='Download';
         };
-        row.appendChild(left); row.appendChild(dl); libgrid.appendChild(row);
+
+        var del=document.createElement('button'); del.className='del'; del.textContent='Delete';
+        del.onclick=async function(){
+          var label=r.source_filename||r.description||'this document';
+          if(!confirm('Remove \u201c'+label+'\u201d from the library? This can be restored by an administrator.')) return;
+          del.textContent='\u2026'; del.disabled=true; dl.disabled=true;
+          try{
+            var res=await postJSON(EP.del,{company_id:COMPANY_ID,translation_id:r.translation_id});
+            if(res && res.deleted){ row.remove(); adjustCount(-1); }
+            else { del.textContent='Delete'; del.disabled=false; dl.disabled=false; alert('Could not remove that document.'); }
+          }catch(e){ del.textContent='Delete'; del.disabled=false; dl.disabled=false; alert('Delete failed: '+(e.message||'server error')); }
+        };
+
+        acts.appendChild(dl); acts.appendChild(del);
+        row.appendChild(left); row.appendChild(acts); libgrid.appendChild(row);
       });
     }catch(err){
       libgrid.innerHTML='<div class="libempty">Library will appear here once the browse endpoint is live.</div>';
       libCount.textContent='\u2014';
     }
   }
+  function adjustCount(delta){
+    var m=(libCount.textContent||'').match(/^(\d+)/);
+    if(!m) return;
+    var n=Math.max(0, parseInt(m[1],10)+delta);
+    libCount.textContent = n + (n===1?' document':' documents');
+  }
+  function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  // Debounced live search + explicit clear.
+  var searchTimer=null;
+  if(libSearch){ libSearch.addEventListener('input', function(){ clearTimeout(searchTimer); searchTimer=setTimeout(loadLibrary, 280); }); }
+  if(libClear){ libClear.addEventListener('click', function(){ if(libSearch){ libSearch.value=''; } loadLibrary(); }); }
   function cap(s){return s?s.charAt(0).toUpperCase()+s.slice(1):s;}
 
   loadLibrary();
