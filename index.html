@@ -66,7 +66,7 @@
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath fill='%236b7f88' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
     background-repeat:no-repeat;background-position:right 14px center}
   select:focus{outline:none;border-color:var(--sb-primary);box-shadow:0 0 0 3px var(--sb-ring)}
-  .segs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;background:var(--sb-bg);border-radius:var(--sb-r-input);padding:3px}
+  .segs{display:grid;grid-template-columns:1fr 1fr;gap:6px;background:var(--sb-bg);border-radius:var(--sb-r-input);padding:3px}
   .seg{border-radius:6px;padding:8px 4px;text-align:center;cursor:pointer}
   .seg:hover .t{color:var(--sb-primary)}
   .seg.active{background:var(--sb-primary)}
@@ -166,9 +166,8 @@
     <div class="field">
       <label class="fl">Style</label>
       <div class="segs" id="segs">
-        <div class="seg" data-reg="basic"><div class="t">Plain</div><div class="d">Clear &amp; literal</div></div>
         <div class="seg active" data-reg="business"><div class="t">Business</div><div class="d">Formal &amp; precise</div></div>
-        <div class="seg" data-reg="conversational"><div class="t">Warm</div><div class="d">Direct &amp; friendly</div></div>
+        <div class="seg" data-reg="conversational"><div class="t">Warm</div><div class="d">Friendly, for a general audience</div></div>
       </div>
     </div>
     <button class="go" id="go" disabled>Translate</button>
