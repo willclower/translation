@@ -7,204 +7,186 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../wellness_tools/studio-brand.css">
+<script src="../wellness_tools/studio-brand.js"></script>
 <style>
-  :root{
-    --navy:#1b2a4a; --blue:#2f6fb0; --orange:#e08a1e;
-    --bg:#f7f6f2; --card:#ffffff; --ink:#2a2f38; --muted:#6b7480;
-    --line:#e6e3da; --ok:#1f7a52; --err:#b0402e; --radius:16px;
-  }
+  /* Studio layout — same positions as the DRL library: header band · white title band with
+     search on the right · tool card on the left · results on the right. Brand = --sb-* tokens. */
+  :root{ --ok:var(--sb-ok); --err:var(--sb-danger); }
   *{box-sizing:border-box}
-  body{
-    margin:0;background:var(--bg);color:var(--ink);
-    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-    line-height:1.55;-webkit-font-smoothing:antialiased;
-  }
-  .topbar{
-    display:flex;align-items:center;justify-content:space-between;
-    padding:18px 32px;border-bottom:1px solid var(--line);background:#fbfaf7;
-  }
-  .brand{font-weight:600;color:var(--blue);font-size:15px;letter-spacing:.01em}
-  .topbar .sub{font-size:12px;color:var(--muted)}
-  .wrap{max-width:940px;margin:0 auto;padding:56px 28px 80px}
+  body{margin:0;background:var(--sb-bg);color:var(--sb-ink);font-family:var(--sb-font);line-height:1.5;-webkit-font-smoothing:antialiased}
 
-  /* hero */
-  .kicker{
-    display:inline-block;font-size:11px;letter-spacing:.16em;text-transform:uppercase;
-    color:var(--blue);font-weight:600;border:1px solid var(--line);
-    border-radius:999px;padding:6px 14px;margin-bottom:22px;background:#fff;
-  }
-  .hero{display:grid;grid-template-columns:1.5fr .8fr;gap:40px;align-items:end;margin-bottom:44px}
-  h1{
-    font-family:'Fraunces',Georgia,serif;font-weight:400;color:var(--navy);
-    font-size:46px;line-height:1.05;margin:0 0 16px;letter-spacing:-.01em;
-  }
-  h1 .accent{display:block;font-style:italic;font-weight:500;color:var(--blue)}
-  .lede{color:var(--muted);font-size:15.5px;max-width:44ch;margin:0}
-  .stats{border-left:2px solid var(--orange);padding-left:18px;display:grid;gap:14px}
-  .stat .l{font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
-  .stat .v{font-family:'Fraunces',serif;font-size:19px;color:var(--navy);font-weight:600}
+  .hero{background:var(--sb-panel);border-bottom:1px solid var(--sb-border)}
+  .hero-in{max-width:1320px;margin:0 auto;padding:30px clamp(16px,3vw,34px) 28px;display:flex;align-items:flex-end;
+    justify-content:space-between;gap:24px 40px;flex-wrap:wrap}
+  .titleblock{min-width:0;flex:1 1 420px}
+  .eyebrow{display:flex;align-items:center;gap:10px;font-size:10.5px;font-weight:700;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--sb-accent-text);margin-bottom:10px}
+  .eyebrow>span{width:24px;height:3px;border-radius:2px;background:var(--sb-accent)}
+  h1{font-weight:800;font-size:clamp(28px,3.4vw,40px);line-height:1.1;letter-spacing:-.02em;margin:0 0 8px;max-width:22ch}
+  h1 em{font-style:normal;color:var(--sb-accent-text)}
+  .lede{margin:0;font-size:13.5px;color:var(--sb-muted);max-width:62ch}
+  .hsearch{flex:0 1 380px;min-width:240px}
+  .hsearch label{display:block;font-size:12px;font-weight:600;margin-bottom:6px}
+  .searchrow{display:flex;gap:8px}
+  .searchwrap{position:relative;flex:1}
+  .searchwrap svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--sb-subtle);pointer-events:none}
+  .searchwrap input{width:100%;height:42px;border:1.5px solid var(--sb-border);border-radius:var(--sb-r-input);padding:0 12px 0 36px;
+    font:inherit;font-size:13.5px;background:var(--sb-bg-lt);color:var(--sb-ink)}
+  .searchwrap input:focus{outline:none;border-color:var(--sb-primary);box-shadow:0 0 0 3px var(--sb-ring);background:#fff}
 
-  .card{
-    background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
-    padding:30px;box-shadow:0 1px 2px rgba(27,42,74,.04);
-  }
-  .field{margin-bottom:24px}
-  label{display:block;font-weight:600;font-size:13.5px;margin-bottom:9px;color:var(--navy)}
-  .hint{font-size:12.5px;color:var(--muted);margin-top:7px}
+  .shell{max-width:1320px;margin:0 auto;padding:24px clamp(16px,3vw,34px) 40px;display:grid;
+    grid-template-columns:minmax(300px,380px) minmax(0,1fr);gap:24px;align-items:start}
+  .card{background:var(--sb-panel);border:1px solid var(--sb-border);border-radius:var(--sb-r-card);box-shadow:var(--sb-shadow);padding:20px;
+    position:sticky;top:16px}
+  .card h2{font-size:15px;font-weight:700;margin:0 0 14px}
+  .field{margin-bottom:18px}
+  label.fl{display:block;font-size:10.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--sb-subtle);margin-bottom:8px}
 
-  .drop{
-    border:2px dashed var(--line);border-radius:12px;padding:30px 20px;text-align:center;
-    cursor:pointer;transition:.15s;background:#fbfaf7;
-  }
-  .drop:hover,.drop.drag{border-color:var(--blue);background:#f1f6fb}
-  .drop .icon{font-size:24px;color:var(--blue)}
-  .drop .big{font-weight:600;color:var(--navy);margin-top:8px;font-size:15px}
-  .drop .small{font-size:12.5px;color:var(--muted);margin-top:3px}
+  .drop{border:1.5px dashed var(--sb-border-st);border-radius:var(--sb-r-card);padding:22px 16px;text-align:center;cursor:pointer;
+    background:var(--sb-bg-lt);transition:border-color .15s,background .15s}
+  .drop:hover,.drop.drag{border-color:var(--sb-primary);background:var(--sb-tint)}
+  .drop .icon{color:var(--sb-primary)}
+  .drop .big{font-weight:700;color:var(--sb-primary);margin-top:6px;font-size:14px}
+  .drop .small{font-size:12px;color:var(--sb-muted);margin-top:3px}
 
-  .files{margin-top:14px;display:none;flex-direction:column;gap:8px}
+  .files{margin-top:12px;display:none;flex-direction:column;gap:8px}
   .files.show{display:flex}
-  .frow{
-    display:flex;align-items:center;gap:12px;padding:11px 14px;border:1px solid var(--line);
-    border-radius:10px;background:#fff;font-size:13.5px;
-  }
-  .frow .nm{font-weight:600;color:var(--navy);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .frow .st{font-size:12px;color:var(--muted);white-space:nowrap}
-  .frow .st.hit{color:var(--ok)}
-  .frow .st.done{color:var(--ok)}
+  .frow{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--sb-border);border-radius:var(--sb-r-input);
+    background:#fff;font-size:13px}
+  .frow .nm{font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .frow .st{font-size:12px;color:var(--sb-subtle);white-space:nowrap}
+  .frow .st.hit,.frow .st.done{color:var(--ok)}
   .frow .st.err{color:var(--err)}
-  .frow .st.busy{color:var(--blue)}
-  .frow .x{color:var(--muted);cursor:pointer;font-size:16px;line-height:1}
+  .frow .st.busy{color:var(--sb-primary)}
+  .frow .x{color:var(--sb-subtle);cursor:pointer;font-size:16px;line-height:1}
 
-  select{
-    width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;
-    font:inherit;color:var(--ink);background:#fff;appearance:none;
-    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath fill='%232f6fb0' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
-    background-repeat:no-repeat;background-position:right 14px center;
-  }
-  .row2{display:grid;grid-template-columns:1fr 1.4fr;gap:18px}
-  .segs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
-  .seg{border:1px solid var(--line);border-radius:10px;padding:11px 8px;text-align:center;cursor:pointer;transition:.12s;background:#fff}
-  .seg:hover{border-color:var(--blue)}
-  .seg.active{border-color:var(--orange);background:#fef7ec;box-shadow:0 0 0 1px var(--orange) inset}
-  .seg .t{font-weight:600;font-size:13.5px;color:var(--navy)}
-  .seg .d{font-size:11px;color:var(--muted);margin-top:2px}
+  select{width:100%;height:42px;padding:0 36px 0 12px;border:1.5px solid var(--sb-border);border-radius:var(--sb-r-input);font:inherit;font-size:13.5px;
+    color:var(--sb-ink);background:#fff;appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath fill='%236b7f88' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 14px center}
+  select:focus{outline:none;border-color:var(--sb-primary);box-shadow:0 0 0 3px var(--sb-ring)}
+  .segs{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;background:var(--sb-bg);border-radius:var(--sb-r-input);padding:3px}
+  .seg{border-radius:6px;padding:8px 4px;text-align:center;cursor:pointer}
+  .seg:hover .t{color:var(--sb-primary)}
+  .seg.active{background:var(--sb-primary)}
+  .seg .t{font-weight:700;font-size:12.5px;color:var(--sb-ink)}
+  .seg .d{font-size:10.5px;color:var(--sb-subtle);margin-top:1px}
+  .seg.active .t,.seg.active .d{color:#fff}
+  .seg.active .d{opacity:.85}
 
-  button.go{
-    width:100%;border:0;border-radius:11px;padding:15px;font:inherit;font-weight:600;
-    font-size:15px;color:#fff;background:var(--navy);cursor:pointer;transition:.15s;margin-top:4px;
-  }
-  button.go:hover{background:#233763}
-  button.go:disabled{background:#a9b2c0;cursor:not-allowed}
-  .notice{margin-top:16px;font-size:12px;color:var(--muted);background:#fbfaf7;border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+  button.go{width:100%;border:0;border-radius:var(--sb-r-input);padding:12px;font:inherit;font-weight:700;font-size:14px;color:#fff;
+    background:var(--sb-primary);cursor:pointer}
+  button.go:hover{background:var(--sb-primary-hover)}
+  button.go:disabled{background:var(--sb-border-st);cursor:not-allowed}
+  .notice{margin-top:14px;font-size:12px;color:var(--sb-muted);background:var(--sb-bg-lt);border:1px solid var(--sb-border-lt);border-radius:var(--sb-r-input);padding:10px 12px}
 
-  /* library */
-  .lib{margin-top:44px}
-  .lib h2{font-family:'Fraunces',serif;font-weight:600;color:var(--navy);font-size:22px;margin:0 0 4px}
-  .lib .sub{font-size:13px;color:var(--muted);margin:0 0 18px}
+  .results{min-width:0}
+  .toolbar{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+  .toolbar h2{font-size:15px;font-weight:700;margin:0}
+  .count{font-size:12.5px;color:var(--sb-muted)}
   .libgrid{display:grid;gap:12px}
-  .lrow{
-    display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;
-    padding:16px 18px;border:1px solid var(--line);border-radius:12px;background:#fff;
-  }
-  .lrow .desc{font-weight:600;color:var(--navy);font-size:14px;margin-bottom:5px}
-  .lrow .meta{font-size:12px;color:var(--muted)}
-  .lrow .tags{margin-top:7px;display:flex;gap:6px;flex-wrap:wrap}
-  .tag{font-size:10.5px;letter-spacing:.03em;color:var(--blue);background:#eef4fb;border-radius:999px;padding:3px 9px}
-  .lrow .dl{border:1px solid var(--line);background:#fff;color:var(--navy);font:inherit;font-weight:600;font-size:12.5px;padding:9px 14px;border-radius:9px;cursor:pointer;white-space:nowrap}
-  .lrow .dl:hover{border-color:var(--blue);color:var(--blue)}
+  .lrow{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;padding:14px 16px;background:var(--sb-panel);
+    border:1px solid var(--sb-border);border-radius:var(--sb-r-card);box-shadow:var(--sb-shadow)}
+  .lrow .desc{font-weight:700;font-size:14px;margin-bottom:3px}
+  .lrow .meta{font-size:12px;color:var(--sb-subtle)}
+  .lrow .tags{margin-top:7px;display:flex;gap:5px;flex-wrap:wrap}
+  .tag{font-size:11px;font-weight:600;color:var(--sb-primary);background:var(--sb-tint);border-radius:var(--sb-r-pill);padding:2px 9px}
   .lrow .acts{display:flex;gap:8px;align-items:center}
-  .lrow .del{border:1px solid var(--line);background:#fff;color:var(--muted);font:inherit;font-weight:600;font-size:12.5px;padding:9px 12px;border-radius:9px;cursor:pointer;white-space:nowrap}
-  .lrow .del:hover{border-color:#c0392b;color:#c0392b}
-  .libsearch{display:flex;gap:8px;align-items:center;margin:0 0 14px}
-  .libsearch input{flex:1;border:1px solid var(--line);border-radius:9px;padding:10px 13px;font:inherit;font-size:13.5px;color:var(--navy);background:#fff}
-  .libsearch input:focus{outline:none;border-color:var(--blue)}
-  .libsearch .clr{border:1px solid var(--line);background:#fff;color:var(--muted);font:inherit;font-size:12.5px;padding:10px 13px;border-radius:9px;cursor:pointer}
-  .libsearch .clr:hover{border-color:var(--blue);color:var(--blue)}
-  .libempty{padding:26px;text-align:center;color:var(--muted);font-size:13.5px;border:1px dashed var(--line);border-radius:12px}
+  .lrow .dl,.lrow .del{font:inherit;font-weight:600;font-size:12.5px;padding:8px 14px;border-radius:var(--sb-r-input);cursor:pointer;white-space:nowrap}
+  .lrow .dl{border:1.5px solid var(--sb-primary);background:var(--sb-primary);color:#fff}
+  .lrow .dl:hover{background:var(--sb-primary-hover);border-color:var(--sb-primary-hover)}
+  .lrow .del{border:1.5px solid var(--sb-border-st);background:#fff;color:var(--sb-muted)}
+  .lrow .del:hover{border-color:var(--sb-danger);color:var(--sb-danger)}
+  .lrow button:disabled{opacity:.55;cursor:default}
+  .clr{font:inherit;font-size:12.5px;font-weight:600;border:1.5px solid var(--sb-border-st);background:#fff;color:var(--sb-ink);
+    padding:0 14px;height:42px;border-radius:var(--sb-r-input);cursor:pointer}
+  .clr:hover{border-color:var(--sb-primary);color:var(--sb-primary)}
+  .libempty{padding:28px;text-align:center;color:var(--sb-muted);font-size:13.5px;background:var(--sb-panel);border:1.5px dashed var(--sb-border-st);border-radius:var(--sb-r-card)}
 
-  .footer{margin-top:56px;padding-top:22px;border-top:1px solid var(--line);display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
-  .footer .mw{font-style:italic;color:var(--orange)}
+  .footer{max-width:1320px;margin:0 auto;padding:18px clamp(16px,3vw,34px) 40px;display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;
+    font-size:12px;color:var(--sb-subtle);border-top:1px solid var(--sb-border)}
+  .footer .mw{font-weight:600;color:var(--sb-accent-text)}
 
-  @media(max-width:720px){
-    .hero{grid-template-columns:1fr;gap:24px}
-    h1{font-size:36px}.row2{grid-template-columns:1fr}
-    .stats{border-left:0;border-top:2px solid var(--orange);padding-left:0;padding-top:16px}
-  }
+  @media(max-width:900px){ .shell{grid-template-columns:1fr} .card{position:static} .hsearch{flex-basis:100%} }
+  @media(max-width:520px){ .sb-header .sb-product{display:none} .lrow{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
-<div class="topbar">
-  <div class="brand" id="brandName">Wellness Tools</div>
-  <div class="sub">Document Translation</div>
-</div>
+<header class="sb-header">
+  <img class="sb-logo" id="sbLogo" alt="">
+  <span class="sb-tenant" id="sbTenant"></span>
+  <span class="sb-product">Document Translation</span>
+  <div class="sb-right"><a href="../wellness_tools/index.html">&larr; Back to tools</a></div>
+</header>
 
-<div class="wrap">
-  <div class="kicker">Translation Studio</div>
-  <div class="hero">
-    <div>
-      <h1>Language Translation<span class="accent">connects cultures.</span></h1>
-      <p class="lede">Upload a Word document, choose a language and a style, and get a faithful translation back &mdash; layout, tables, and formatting fully intact. Once a document is translated, it&rsquo;s saved to your library so no one has to do it twice.</p>
+<section class="hero">
+  <div class="hero-in">
+    <div class="titleblock">
+      <div class="eyebrow"><span></span>Document translation</div>
+      <h1>Language translation <em>connects cultures.</em></h1>
+      <p class="lede">Upload a Word document, choose a language and a style, and get a faithful translation back, with layout, tables, and formatting intact. Every translation is saved to your library and reused automatically.</p>
     </div>
-    <div class="stats">
-      <div class="stat"><div class="l">Formats</div><div class="v">Word (.docx)</div></div>
-      <div class="stat"><div class="l">Styles</div><div class="v">Plain &middot; Business &middot; Warm</div></div>
-      <div class="stat"><div class="l">Library</div><div class="v" id="libCount">&mdash;</div></div>
+    <div class="hsearch">
+      <label for="libSearch">Search your library</label>
+      <div class="searchrow">
+        <div class="searchwrap">
+          <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M11 11l3.5 3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <input type="search" id="libSearch" placeholder="Document name or description" autocomplete="off">
+        </div>
+        <button class="clr" id="libClear" type="button">Clear</button>
+      </div>
     </div>
   </div>
+</section>
 
-  <div class="card">
+<div class="shell">
+  <section class="card" aria-labelledby="trTitle">
+    <h2 id="trTitle">Translate a document</h2>
     <div class="field">
-      <label>Documents</label>
-      <div class="drop" id="drop">
-        <div class="icon">&#8593;</div>
+      <label class="fl">Documents</label>
+      <div class="drop" id="drop" role="button" tabindex="0">
+        <svg class="icon" width="22" height="22" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 11V3m0 0L4.5 6.5M8 3l3.5 3.5M3 13h10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <div class="big">Drop files here, or click to browse</div>
-        <div class="small">Word (.docx) &middot; add several at once for batch translation</div>
+        <div class="small">Word (.docx). Add several at once to translate a batch.</div>
       </div>
       <input type="file" id="file" accept=".docx" multiple hidden>
       <div class="files" id="files"></div>
     </div>
-
-    <div class="row2">
-      <div class="field" style="margin-bottom:0">
-        <label for="lang">Translate into</label>
-        <select id="lang">
-          <option value="Spanish" selected>Spanish</option>
-          <option value="French">French</option>
-          <option value="Portuguese">Portuguese</option>
-          <option value="Vietnamese">Vietnamese</option>
-          <option value="Chinese (Simplified)">Chinese (Simplified)</option>
-        </select>
-      </div>
-      <div class="field" style="margin-bottom:0">
-        <label>Style</label>
-        <div class="segs" id="segs">
-          <div class="seg" data-reg="basic"><div class="t">Plain</div><div class="d">Clear &amp; literal</div></div>
-          <div class="seg active" data-reg="business"><div class="t">Business</div><div class="d">Formal &amp; precise</div></div>
-          <div class="seg" data-reg="conversational"><div class="t">Warm</div><div class="d">Direct &amp; friendly</div></div>
-        </div>
+    <div class="field">
+      <label class="fl" for="lang">Translate into</label>
+      <select id="lang">
+        <option value="Spanish" selected>Spanish</option>
+        <option value="French">French</option>
+        <option value="Portuguese">Portuguese</option>
+        <option value="Vietnamese">Vietnamese</option>
+        <option value="Chinese (Simplified)">Chinese (Simplified)</option>
+      </select>
+    </div>
+    <div class="field">
+      <label class="fl">Style</label>
+      <div class="segs" id="segs">
+        <div class="seg" data-reg="basic"><div class="t">Plain</div><div class="d">Clear &amp; literal</div></div>
+        <div class="seg active" data-reg="business"><div class="t">Business</div><div class="d">Formal &amp; precise</div></div>
+        <div class="seg" data-reg="conversational"><div class="t">Warm</div><div class="d">Direct &amp; friendly</div></div>
       </div>
     </div>
-
-    <div style="height:22px"></div>
     <button class="go" id="go" disabled>Translate</button>
     <div class="notice">For general and program documents. Do not upload documents containing an individual&rsquo;s personal health information.</div>
-  </div>
+  </section>
 
-  <div class="lib">
-    <h2>Your translation library</h2>
-    <p class="sub">Everything your organization has already translated. Reused automatically when the same document comes through again.</p>
-    <div class="libsearch">
-      <input type="text" id="libSearch" placeholder="Search by document name or description&hellip;" autocomplete="off">
-      <button class="clr" id="libClear" type="button">Clear</button>
+  <section class="results" aria-labelledby="libTitle">
+    <div class="toolbar">
+      <h2 id="libTitle">Your translation library</h2>
+      <span class="count" id="libCount">&mdash;</span>
     </div>
     <div class="libgrid" id="libgrid"><div class="libempty">Loading&hellip;</div></div>
-  </div>
+  </section>
+</div>
 
-  <div class="footer">
-    <div>This tool is powered by <span class="mw">Mediterranean Wellness</span> &mdash; clinical integration technology for population health.</div>
-    <div id="footRight">&nbsp;</div>
-  </div>
+<div class="footer">
+  <div>Powered by <span class="mw">Mediterranean Wellness</span>, clinical integration technology for population health.</div>
+  <div id="footRight">&nbsp;</div>
 </div>
 
 <script>
@@ -456,6 +438,18 @@
   if(libSearch){ libSearch.addEventListener('input', function(){ clearTimeout(searchTimer); searchTimer=setTimeout(loadLibrary, 280); }); }
   if(libClear){ libClear.addEventListener('click', function(){ if(libSearch){ libSearch.value=''; } loadLibrary(); }); }
   function cap(s){return s?s.charAt(0).toUpperCase()+s.slice(1):s;}
+
+  // Studio brand: tenant brand_config from hub-config; none/failed → MedWell defaults.
+  (async function(){
+    try{
+      var r=await fetch("https://n8n-admin.willclower.com/webhook/hub-config",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
+      var c=await r.json(); if(Array.isArray(c)) c=c[0];
+      var nm=StudioBrand.apply(c&&c.brand_config, c&&c.name);
+      document.title=nm+" \u2014 Document Translation";
+    }catch(e){ StudioBrand.apply(null); }
+  })();
+  // keyboard: Enter/Space on the drop zone opens the file picker
+  drop.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); fileInput.click(); } });
 
   loadLibrary();
 </script>
