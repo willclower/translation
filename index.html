@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="../wellness_tools/studio-brand.css">
 <script src="../wellness_tools/studio-brand.js"></script>
+<script src="../wellness_tools/studio-auth.js"></script>
 <style>
   /* Studio layout — same positions as the DRL library: header band · white title band with
      search on the right · tool card on the left · results on the right. Brand = --sb-* tokens. */
@@ -161,7 +162,6 @@
   <span class="sb-product">Document Translation</span>
   <div class="sb-right">
     <span class="who" id="whoami" style="display:none"></span>
-    <button class="lnk" id="loginLink" type="button">Log in</button>
     <button class="lnk" id="logoutLink" type="button" style="display:none">Log out</button>
     <a href="../wellness_tools/index.html">&larr; Back to tools</a>
   </div>
@@ -242,17 +242,6 @@
   </section>
 </div>
 
-<div class="mask" id="loginMask" role="dialog" aria-modal="true" aria-labelledby="liTitle">
-  <div class="lbox">
-    <h2 id="liTitle">Log in to MedWell Studio</h2>
-    <p>One login covers every Studio page.</p>
-    <input id="liEmail" type="email" placeholder="Email" autocomplete="username">
-    <input id="liPw" type="password" placeholder="Password" autocomplete="current-password">
-    <div class="msg" id="liMsg"></div>
-    <button class="go" id="liGo" type="button">Log in</button>
-  </div>
-</div>
-
 <div class="footer">
   <div>Powered by <span class="mw">Mediterranean Wellness</span>, clinical integration technology for population health.</div>
   <div id="footRight">&nbsp;</div>
@@ -273,8 +262,8 @@
   // Who you are and what you can see is resolved SERVER-SIDE from the session in every
   // translate workflow — the browser never sends an org or company id.
   const DRL_API = "https://n8n-admin.willclower.com/webhook/drl";
-  let SESSION = null;   // { session, am:{ id, name, is_super_admin } }
-  try{ const s = localStorage.getItem("mw_am"); if(s) SESSION = JSON.parse(s); }catch(e){}
+  // Gate: no session -> hub login (then back here); no 'translation' tool -> hub.
+  let SESSION = StudioAuth.require('translation');   // { session, am:{ id, name, is_super_admin, tools } }
   const SOURCE_LANG = "English";
   const GLOSSARY_VERSION = null;
   // ==================
@@ -510,39 +499,10 @@
     [].forEach.call(forList.querySelectorAll('input'), function(c){ c.checked = forAll.checked; }); syncFor();
   });
   forList.addEventListener('change', syncFor);
-  function saveSession(){ try{ localStorage.setItem('mw_am', JSON.stringify(SESSION)); }catch(e){} }
-  function clearSession(){ SESSION=null; try{ localStorage.removeItem('mw_am'); }catch(e){} paintAuth(); }
-  function paintAuth(){
-    var inn=!!SESSION;
-    document.getElementById('loginLink').style.display = inn ? 'none' : '';
-    document.getElementById('logoutLink').style.display = inn ? '' : 'none';
-    var w=document.getElementById('whoami'); w.style.display = inn ? '' : 'none';
-    if(inn) w.textContent = SESSION.am.name + (isSuper() ? ' (admin)' : '');
-    updateGo();
-  }
-  function updateGo(){
-    var ready = !!SESSION && selectedOwners().length > 0;
-    go.disabled = queue.length===0 || !ready;
-  }
-  function openLogin(){ document.getElementById('loginMask').classList.add('show'); document.getElementById('liEmail').focus(); }
-  function closeLogin(){ document.getElementById('loginMask').classList.remove('show'); }
-  async function doLogin(){
-    var email=document.getElementById('liEmail').value.trim(), pw=document.getElementById('liPw').value;
-    var m=document.getElementById('liMsg'); m.className='msg'; m.textContent='Signing in\u2026';
-    try{
-      var res=await fetch(DRL_API+'/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,password:pw})});
-      var d=await res.json();
-      if(!d||!d.ok){ m.className='msg err'; m.textContent='Email or password not recognized.'; return; }
-      SESSION={session:d.session, am:d.am}; saveSession();
-      m.className='msg ok'; m.textContent='Signed in.'; document.getElementById('liPw').value='';
-      setTimeout(closeLogin,250); paintAuth(); await loadScope(); loadLibrary();
-    }catch(e){ m.className='msg err'; m.textContent='Could not reach the server.'; }
-  }
-  document.getElementById('loginLink').onclick=openLogin;
-  document.getElementById('logoutLink').onclick=function(){ clearSession(); CLIENTS=[]; renderScope(); loadLibrary(); };
-  document.getElementById('liGo').onclick=doLogin;
-  document.getElementById('liPw').addEventListener('keydown',function(e){ if(e.key==='Enter') doLogin(); });
-  document.getElementById('loginMask').addEventListener('click',function(e){ if(e.target.id==='loginMask') closeLogin(); });
+  // Login lives on the hub. Expired session -> back to the hub, then straight back here.
+  function clearSession(){ SESSION=null; StudioAuth.clear(); }
+  function openLogin(){ StudioAuth.expired(); }
+  function paintAuth(){ StudioAuth.paint(); updateGo(); }
 
   // Clients this login may translate for. Same list the DRL roster shows (server-scoped).
   async function loadScope(){
@@ -683,7 +643,7 @@
   // Studio brand: tenant brand_config from hub-config; none/failed → MedWell defaults.
   (async function(){
     try{
-      var r=await fetch("https://n8n-admin.willclower.com/webhook/hub-config",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});
+      var r=await fetch("https://n8n-admin.willclower.com/webhook/hub-config",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({session:sid()})});
       var c=await r.json(); if(Array.isArray(c)) c=c[0];
       var nm=StudioBrand.apply(c&&c.brand_config, c&&c.name);
       document.title=nm+" \u2014 Document Translation";
@@ -693,7 +653,7 @@
   drop.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); fileInput.click(); } });
 
   paintAuth();
-  (async function(){ await loadScope(); loadLibrary(); if(!SESSION) openLogin(); })();
+  if(SESSION){ (async function(){ await loadScope(); loadLibrary(); })(); }
 </script>
 </body>
 </html>
