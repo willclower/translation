@@ -117,6 +117,16 @@
   .ochip{font:inherit;font-size:12px;font-weight:600;border:1.5px solid var(--sb-border-st);background:#fff;color:var(--sb-ink);
     border-radius:var(--sb-r-pill);padding:4px 12px;cursor:pointer}
   .ochip.on{background:var(--sb-primary);border-color:var(--sb-primary);color:#fff}
+  .forbox{border:1.5px solid var(--sb-border);border-radius:var(--sb-r-input);background:#fff;overflow:hidden}
+  .forall{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:var(--sb-bg-lt);
+    border-bottom:1px solid var(--sb-border-lt);font-size:13px}
+  .forall .n{font-size:12px;color:var(--sb-muted)}
+  .forlist{list-style:none;margin:0;padding:4px 0;max-height:220px;overflow-y:auto}
+  .forlist li label,.forall label{display:flex;align-items:center;gap:9px;cursor:pointer}
+  .forlist li label{padding:7px 12px;font-size:13px}
+  .forlist li label:hover{background:var(--sb-tint)}
+  .forlist input,.forall input{accent-color:var(--sb-primary);width:15px;height:15px;margin:0}
+  .forempty{padding:10px 12px;font-size:12.5px;color:var(--sb-muted)}
   .lrow .owner{font-weight:700;color:var(--sb-primary)}
   .hint{font-size:12px;color:var(--sb-muted);margin-top:6px}
   .hint.err{color:var(--err)}
@@ -171,9 +181,12 @@
   <section class="card" aria-labelledby="trTitle">
     <h2 id="trTitle">Translate a document</h2>
     <div class="field">
-      <label class="fl" for="forSel">Translating for</label>
-      <select id="forSel"><option value="">Log in to choose</option></select>
-      <div class="hint" id="forHint">The translation is saved to this organization&rsquo;s library.</div>
+      <label class="fl">Translating for</label>
+      <div class="forbox">
+        <div class="forall" id="forAllRow"><label><input type="checkbox" id="forAll"> <b>All</b></label><span class="n" id="forCount">0 selected</span></div>
+        <ul class="forlist" id="forList"><li class="forempty">Log in to choose</li></ul>
+      </div>
+      <div class="hint" id="forHint">Translated once, saved to every library you check.</div>
     </div>
     <div class="field">
       <label class="fl">Documents</label>
@@ -347,7 +360,35 @@
   function outName(srcName, lang){ return srcName.replace(/\.docx$/i,'') + '_' + (LANG_CODE[lang]||'TR') + '.docx'; }
 
   // ---- per-file pipeline: hash -> check -> (reuse | translate -> store) ----
+  // One file, many owners: the FIRST checked library gets the real translation (or a library
+  // reuse); every other checked library gets a server-side copy through translate-check's
+  // same-parent reuse — no second translation run. If a copy can't be made (platform admin
+  // picking clients under a different parent), the same translated bytes are stored for it.
   async function processOne(q){
+    var owners=selectedOwners(), f=q.file, lang=langSel.value;
+    if(!owners.length){ setStatus(q,'err','choose who it\u2019s for'); return; }
+    var res=await processFor(q, owners[0]);
+    if(!res || owners.length===1) return;
+    var saved=1;
+    for(var i=1;i<owners.length;i++){
+      setStatus(q,'busy','saving to library '+(i+1)+' of '+owners.length+'\u2026');
+      try{
+        var chk=await postJSON(EP.check,{session:sid(),for_client:owners[i],source_sha256:res.hash,target_lang:lang,register:register});
+        if(!(chk && chk.hit)){
+          await postJSON(EP.store,{
+            session:sid(),for_client:owners[i],source_filename:f.name,
+            source_sha256:res.hash,source_lang:SOURCE_LANG,target_lang:lang,register:register,
+            glossary_version:GLOSSARY_VERSION,string_count:res.count||null,
+            strings_sample:res.sample||[],source_b64:res.srcB64,translated_b64:res.outB64
+          });
+        }
+        saved++;
+      }catch(e){}
+    }
+    setStatus(q, saved===owners.length?'done':'err', res.label+' \u00b7 saved to '+saved+' of '+owners.length+' libraries');
+  }
+
+  async function processFor(q, owner){
     var f=q.file, lang=langSel.value;
     try{
       setStatus(q,'busy','hashing\u2026');
@@ -355,13 +396,14 @@
       var hash=await sha256hex(srcBuf);
 
       setStatus(q,'busy','checking library\u2026');
-      var chk=await postJSON(EP.check,{session:sid(),for_client:forClient(),source_sha256:hash,target_lang:lang,register:register});
+      var chk=await postJSON(EP.check,{session:sid(),for_client:owner,source_sha256:hash,target_lang:lang,register:register});
       if (chk && chk.hit){
         setStatus(q,'busy','reusing saved\u2026');
         var blob=await postForBlob(EP.fetch,{session:sid(),translation_id:chk.translation_id});
         download(blob, outName(f.name,lang));
-        setStatus(q,'hit', chk.reused ? 'copied from an existing translation \u2193' : 'reused from library \u2193');
-        return;
+        var lbl = chk.reused ? 'copied from an existing translation \u2193' : 'reused from library \u2193';
+        setStatus(q,'hit', lbl);
+        return { hash:hash, label:lbl, srcB64:bufToB64(srcBuf), outB64:await blobToB64(blob) };
       }
 
       setStatus(q,'busy','reading\u2026');
@@ -381,14 +423,17 @@
       setStatus(q,'busy','saving to library\u2026');
       var srcB64=bufToB64(srcBuf), outB64=await blobToB64(blob);
       await postJSON(EP.store,{
-        session:sid(),for_client:forClient(),source_filename:f.name,
+        session:sid(),for_client:owner,source_filename:f.name,
         source_sha256:hash,source_lang:SOURCE_LANG,target_lang:lang,register:register,
         glossary_version:GLOSSARY_VERSION,string_count:ex.strings.length,
         strings_sample:ex.strings.slice(0,25),source_b64:srcB64,translated_b64:outB64
       });
       setStatus(q,'done','translated \u2193');
+      return { hash:hash, label:'translated \u2193', srcB64:srcB64, outB64:outB64,
+               count:ex.strings.length, sample:ex.strings.slice(0,25) };
     }catch(err){
       setStatus(q,'err', err.message||'failed');
+      return null;
     }
   }
 
@@ -416,13 +461,26 @@
   }
 
   // ---- session + scope ----
-  var forSel = document.getElementById('forSel'), forHint = document.getElementById('forHint');
+  var forList = document.getElementById('forList'), forAll = document.getElementById('forAll'),
+      forCount = document.getElementById('forCount'), forHint = document.getElementById('forHint');
   var ownChips = document.getElementById('ownChips');
   var CLIENTS = [];          // clients this login can translate for (from drl client-list)
   var ownerFilter = [];      // [] = everything visible; else client ids and/or 'own'
   function sid(){ return SESSION ? SESSION.session : ''; }
   function isSuper(){ return !!(SESSION && SESSION.am && SESSION.am.is_super_admin); }
-  function forClient(){ return forSel.value === 'own' ? '' : forSel.value; }
+  // checked libraries, in list order: 'own' and/or client ids
+  function selectedOwners(){ return [].map.call(forList.querySelectorAll('input:checked'), function(c){ return c.value; }); }
+  function syncFor(){
+    var all=forList.querySelectorAll('input'), on=forList.querySelectorAll('input:checked');
+    forAll.checked = all.length>0 && on.length===all.length;
+    forAll.indeterminate = on.length>0 && on.length<all.length;
+    forCount.textContent = on.length + ' selected';
+    updateGo();
+  }
+  forAll.addEventListener('change', function(){
+    [].forEach.call(forList.querySelectorAll('input'), function(c){ c.checked = forAll.checked; }); syncFor();
+  });
+  forList.addEventListener('change', syncFor);
   function saveSession(){ try{ localStorage.setItem('mw_am', JSON.stringify(SESSION)); }catch(e){} }
   function clearSession(){ SESSION=null; try{ localStorage.removeItem('mw_am'); }catch(e){} paintAuth(); }
   function paintAuth(){
@@ -434,7 +492,7 @@
     updateGo();
   }
   function updateGo(){
-    var ready = !!SESSION && forSel.value !== '';
+    var ready = !!SESSION && selectedOwners().length > 0;
     go.disabled = queue.length===0 || !ready;
   }
   function openLogin(){ document.getElementById('loginMask').classList.add('show'); document.getElementById('liEmail').focus(); }
@@ -472,16 +530,24 @@
   }
   function clientLabel(c){ return c.parent_name ? (c.parent_name+' \u2014 '+c.name) : c.name; }
   function renderScope(){
-    forSel.innerHTML=''; forHint.className='hint';
-    if(!SESSION){ forSel.add(new Option('Log in to choose','')); forHint.textContent='Log in to translate and see your library.'; }
+    var keep=selectedOwners(); forList.innerHTML=''; forHint.className='hint';
+    var rows=[]; if(SESSION && isSuper()) rows.push({id:'own',label:'Our own organization'});
+    if(SESSION) CLIENTS.forEach(function(c){ rows.push({id:c.id,label:clientLabel(c)}); });
+    if(!SESSION){ forList.innerHTML='<li class="forempty">Log in to choose</li>'; forHint.textContent='Log in to translate and see your library.'; }
+    else if(!rows.length){ forList.innerHTML='<li class="forempty">No clients assigned</li>'; forHint.className='hint err';
+      forHint.textContent='You have no clients assigned yet. Ask your administrator.'; }
     else{
-      if(isSuper()) forSel.add(new Option('Our own organization','own'));
-      else if(CLIENTS.length>1) forSel.add(new Option('Choose a client\u2026',''));
-      CLIENTS.forEach(function(c){ forSel.add(new Option(clientLabel(c), c.id)); });
-      if(!isSuper() && !CLIENTS.length){ forSel.add(new Option('No clients assigned','')); forHint.className='hint err';
-        forHint.textContent='You have no clients assigned yet. Ask your administrator.'; }
-      else forHint.textContent='The translation is saved to this organization\u2019s library.';
+      rows.forEach(function(r){
+        var li=document.createElement('li'), lb=document.createElement('label'), cb=document.createElement('input');
+        cb.type='checkbox'; cb.value=r.id;
+        // keep picks across re-renders; with only one choice, pre-check it
+        cb.checked = keep.indexOf(r.id)>-1 || rows.length===1;
+        lb.appendChild(cb); lb.appendChild(document.createTextNode(' '+r.label)); li.appendChild(lb); forList.appendChild(li);
+      });
+      forHint.textContent='Translated once, saved to every library you check.';
     }
+    document.getElementById('forAllRow').style.display = rows.length>1 ? '' : 'none';
+    syncFor();
     // owner filter chips: only useful when more than one library is visible
     ownChips.innerHTML='';
     var opts=[]; if(isSuper()) opts.push({id:'own',label:'Our own'});
@@ -499,7 +565,7 @@
     } else ownerFilter=[];
     updateGo();
   }
-  forSel.addEventListener('change', updateGo);
+
 
   go.addEventListener('click', async function(){
     go.disabled=true;
