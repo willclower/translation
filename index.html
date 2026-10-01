@@ -108,6 +108,28 @@
     font-size:12px;color:var(--sb-subtle);border-top:1px solid var(--sb-border)}
   .footer .mw{font-weight:600;color:var(--sb-accent-text)}
 
+  /* login + scope (Studio login shared with the DRL; one session for all Studio pages) */
+  .sb-right{display:flex;align-items:center;gap:14px}
+  .sb-right .who{font-size:12.5px;opacity:.9}
+  .sb-right button.lnk{font:inherit;font-size:12.5px;font-weight:600;background:none;border:0;color:inherit;cursor:pointer;text-decoration:underline;padding:0}
+  .ownchips{display:flex;flex-wrap:wrap;gap:7px;margin:-2px 0 14px}
+  .ownchips:empty{display:none}
+  .ochip{font:inherit;font-size:12px;font-weight:600;border:1.5px solid var(--sb-border-st);background:#fff;color:var(--sb-ink);
+    border-radius:var(--sb-r-pill);padding:4px 12px;cursor:pointer}
+  .ochip.on{background:var(--sb-primary);border-color:var(--sb-primary);color:#fff}
+  .lrow .owner{font-weight:700;color:var(--sb-primary)}
+  .hint{font-size:12px;color:var(--sb-muted);margin-top:6px}
+  .hint.err{color:var(--err)}
+  .mask{position:fixed;inset:0;background:rgba(10,20,28,.55);display:none;align-items:center;justify-content:center;z-index:1000}
+  .mask.show{display:flex}
+  .lbox{background:#fff;border-radius:var(--sb-r-card);padding:24px;width:min(380px,92vw);box-shadow:0 24px 70px -20px rgba(0,0,0,.6)}
+  .lbox h2{font-size:17px;margin:0 0 4px}
+  .lbox p{font-size:12.5px;color:var(--sb-muted);margin:0 0 16px}
+  .lbox input{width:100%;height:42px;border:1.5px solid var(--sb-border);border-radius:var(--sb-r-input);padding:0 12px;font:inherit;font-size:13.5px;margin-bottom:10px}
+  .lbox input:focus{outline:none;border-color:var(--sb-primary);box-shadow:0 0 0 3px var(--sb-ring)}
+  .lbox .msg{font-size:12.5px;min-height:18px;margin:2px 0 10px;color:var(--sb-muted)}
+  .lbox .msg.err{color:var(--err)} .lbox .msg.ok{color:var(--ok)}
+
   @media(max-width:900px){ .shell{grid-template-columns:1fr} .card{position:static} .hsearch{flex-basis:100%} }
   @media(max-width:520px){ .sb-header .sb-product{display:none} .lrow{grid-template-columns:1fr} }
 </style>
@@ -117,7 +139,12 @@
   <img class="sb-logo" id="sbLogo" alt="">
   <span class="sb-tenant" id="sbTenant"></span>
   <span class="sb-product">Document Translation</span>
-  <div class="sb-right"><a href="../wellness_tools/index.html">&larr; Back to tools</a></div>
+  <div class="sb-right">
+    <span class="who" id="whoami" style="display:none"></span>
+    <button class="lnk" id="loginLink" type="button">Log in</button>
+    <button class="lnk" id="logoutLink" type="button" style="display:none">Log out</button>
+    <a href="../wellness_tools/index.html">&larr; Back to tools</a>
+  </div>
 </header>
 
 <section class="hero">
@@ -143,6 +170,11 @@
 <div class="shell">
   <section class="card" aria-labelledby="trTitle">
     <h2 id="trTitle">Translate a document</h2>
+    <div class="field">
+      <label class="fl" for="forSel">Translating for</label>
+      <select id="forSel"><option value="">Log in to choose</option></select>
+      <div class="hint" id="forHint">The translation is saved to this organization&rsquo;s library.</div>
+    </div>
     <div class="field">
       <label class="fl">Documents</label>
       <div class="drop" id="drop" role="button" tabindex="0">
@@ -179,8 +211,20 @@
       <h2 id="libTitle">Your translation library</h2>
       <span class="count" id="libCount">&mdash;</span>
     </div>
+    <div class="ownchips" id="ownChips"></div>
     <div class="libgrid" id="libgrid"><div class="libempty">Loading&hellip;</div></div>
   </section>
+</div>
+
+<div class="mask" id="loginMask" role="dialog" aria-modal="true" aria-labelledby="liTitle">
+  <div class="lbox">
+    <h2 id="liTitle">Log in to MedWell Studio</h2>
+    <p>One login covers every Studio page.</p>
+    <input id="liEmail" type="email" placeholder="Email" autocomplete="username">
+    <input id="liPw" type="password" placeholder="Password" autocomplete="current-password">
+    <div class="msg" id="liMsg"></div>
+    <button class="go" id="liGo" type="button">Log in</button>
+  </div>
 </div>
 
 <div class="footer">
@@ -199,10 +243,12 @@
     fetch:     HOST + "/translate-fetch",      // download stored (built next)
     del:       HOST + "/translate-delete"      // soft-delete a library row
   };
-  // Tenant identity. On the white-labeled admin these are injected server-side;
-  // hardcoded here for the test page. (For prod, company_id MUST be trusted, not client-set.)
-  const COMPANY_ID = "100";
-  const USER_ID = "4";
+  // Identity = the shared MedWell Studio login (same session as the DRL, localStorage "mw_am").
+  // Who you are and what you can see is resolved SERVER-SIDE from the session in every
+  // translate workflow — the browser never sends an org or company id.
+  const DRL_API = "https://n8n-admin.willclower.com/webhook/drl";
+  let SESSION = null;   // { session, am:{ id, name, is_super_admin } }
+  try{ const s = localStorage.getItem("mw_am"); if(s) SESSION = JSON.parse(s); }catch(e){}
   const SOURCE_LANG = "English";
   const GLOSSARY_VERSION = null;
   // ==================
@@ -255,7 +301,7 @@
       filesBox.appendChild(row); q.statusEl=st;
     });
     filesBox.classList.toggle('show', queue.length>0);
-    go.disabled = queue.length===0;
+    updateGo();
     go.textContent = queue.length>1 ? ('Translate '+queue.length+' documents') : 'Translate';
   }
   function setStatus(q, kind, txt){ if(!q.statusEl) return; q.statusEl.className='st '+kind; q.statusEl.textContent=txt; }
@@ -309,12 +355,12 @@
       var hash=await sha256hex(srcBuf);
 
       setStatus(q,'busy','checking library\u2026');
-      var chk=await postJSON(EP.check,{company_id:COMPANY_ID,source_sha256:hash,target_lang:lang,register:register});
+      var chk=await postJSON(EP.check,{session:sid(),for_client:forClient(),source_sha256:hash,target_lang:lang,register:register});
       if (chk && chk.hit){
         setStatus(q,'busy','reusing saved\u2026');
-        var blob=await postForBlob(EP.fetch,{company_id:COMPANY_ID,translation_id:chk.translation_id});
+        var blob=await postForBlob(EP.fetch,{session:sid(),translation_id:chk.translation_id});
         download(blob, outName(f.name,lang));
-        setStatus(q,'hit','reused from library \u2193');
+        setStatus(q,'hit', chk.reused ? 'copied from an existing translation \u2193' : 'reused from library \u2193');
         return;
       }
 
@@ -335,7 +381,7 @@
       setStatus(q,'busy','saving to library\u2026');
       var srcB64=bufToB64(srcBuf), outB64=await blobToB64(blob);
       await postJSON(EP.store,{
-        company_id:COMPANY_ID,uploader_user_id:USER_ID,source_filename:f.name,
+        session:sid(),for_client:forClient(),source_filename:f.name,
         source_sha256:hash,source_lang:SOURCE_LANG,target_lang:lang,register:register,
         glossary_version:GLOSSARY_VERSION,string_count:ex.strings.length,
         strings_sample:ex.strings.slice(0,25),source_b64:srcB64,translated_b64:outB64
@@ -346,30 +392,130 @@
     }
   }
 
+  // Every translate workflow answers {ok:false, error} when the session is missing/expired
+  // ('unauthorized'), the picked client isn't yours ('forbidden'), or an AM didn't pick a client
+  // ('pick_client'). An expired session always opens the login box.
+  var ERR_TXT = { unauthorized:'please log in', forbidden:'not one of your clients', pick_client:'choose a client first' };
+  function authFail(d){
+    if(d && d.ok===false){
+      if(d.error==='unauthorized'){ clearSession(); openLogin(); }
+      throw new Error(ERR_TXT[d.error] || d.error || 'not allowed');
+    }
+    return d;
+  }
   async function postJSON(url, body){
     var res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     if(!res.ok) throw new Error('server '+res.status);
-    return res.json();
+    return authFail(await res.json());
   }
   async function postForBlob(url, body){
     var res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
     if(!res.ok) throw new Error('server '+res.status);
+    if((res.headers.get('content-type')||'').indexOf('json')>-1) authFail(await res.json());
     return res.blob();
   }
+
+  // ---- session + scope ----
+  var forSel = document.getElementById('forSel'), forHint = document.getElementById('forHint');
+  var ownChips = document.getElementById('ownChips');
+  var CLIENTS = [];          // clients this login can translate for (from drl client-list)
+  var ownerFilter = [];      // [] = everything visible; else client ids and/or 'own'
+  function sid(){ return SESSION ? SESSION.session : ''; }
+  function isSuper(){ return !!(SESSION && SESSION.am && SESSION.am.is_super_admin); }
+  function forClient(){ return forSel.value === 'own' ? '' : forSel.value; }
+  function saveSession(){ try{ localStorage.setItem('mw_am', JSON.stringify(SESSION)); }catch(e){} }
+  function clearSession(){ SESSION=null; try{ localStorage.removeItem('mw_am'); }catch(e){} paintAuth(); }
+  function paintAuth(){
+    var inn=!!SESSION;
+    document.getElementById('loginLink').style.display = inn ? 'none' : '';
+    document.getElementById('logoutLink').style.display = inn ? '' : 'none';
+    var w=document.getElementById('whoami'); w.style.display = inn ? '' : 'none';
+    if(inn) w.textContent = SESSION.am.name + (isSuper() ? ' (admin)' : '');
+    updateGo();
+  }
+  function updateGo(){
+    var ready = !!SESSION && forSel.value !== '';
+    go.disabled = queue.length===0 || !ready;
+  }
+  function openLogin(){ document.getElementById('loginMask').classList.add('show'); document.getElementById('liEmail').focus(); }
+  function closeLogin(){ document.getElementById('loginMask').classList.remove('show'); }
+  async function doLogin(){
+    var email=document.getElementById('liEmail').value.trim(), pw=document.getElementById('liPw').value;
+    var m=document.getElementById('liMsg'); m.className='msg'; m.textContent='Signing in\u2026';
+    try{
+      var res=await fetch(DRL_API+'/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email,password:pw})});
+      var d=await res.json();
+      if(!d||!d.ok){ m.className='msg err'; m.textContent='Email or password not recognized.'; return; }
+      SESSION={session:d.session, am:d.am}; saveSession();
+      m.className='msg ok'; m.textContent='Signed in.'; document.getElementById('liPw').value='';
+      setTimeout(closeLogin,250); paintAuth(); await loadScope(); loadLibrary();
+    }catch(e){ m.className='msg err'; m.textContent='Could not reach the server.'; }
+  }
+  document.getElementById('loginLink').onclick=openLogin;
+  document.getElementById('logoutLink').onclick=function(){ clearSession(); CLIENTS=[]; renderScope(); loadLibrary(); };
+  document.getElementById('liGo').onclick=doLogin;
+  document.getElementById('liPw').addEventListener('keydown',function(e){ if(e.key==='Enter') doLogin(); });
+  document.getElementById('loginMask').addEventListener('click',function(e){ if(e.target.id==='loginMask') closeLogin(); });
+
+  // Clients this login may translate for. Same list the DRL roster shows (server-scoped).
+  async function loadScope(){
+    CLIENTS=[];
+    if(SESSION){
+      try{
+        var res=await fetch(DRL_API+'/client-list',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session:sid()})});
+        var d=await res.json();
+        if(d && d.ok) CLIENTS=d.clients||[];
+        else if(d && d.error==='unauthorized'){ clearSession(); openLogin(); }
+      }catch(e){}
+    }
+    renderScope();
+  }
+  function clientLabel(c){ return c.parent_name ? (c.parent_name+' \u2014 '+c.name) : c.name; }
+  function renderScope(){
+    forSel.innerHTML=''; forHint.className='hint';
+    if(!SESSION){ forSel.add(new Option('Log in to choose','')); forHint.textContent='Log in to translate and see your library.'; }
+    else{
+      if(isSuper()) forSel.add(new Option('Our own organization','own'));
+      else if(CLIENTS.length>1) forSel.add(new Option('Choose a client\u2026',''));
+      CLIENTS.forEach(function(c){ forSel.add(new Option(clientLabel(c), c.id)); });
+      if(!isSuper() && !CLIENTS.length){ forSel.add(new Option('No clients assigned','')); forHint.className='hint err';
+        forHint.textContent='You have no clients assigned yet. Ask your administrator.'; }
+      else forHint.textContent='The translation is saved to this organization\u2019s library.';
+    }
+    // owner filter chips: only useful when more than one library is visible
+    ownChips.innerHTML='';
+    var opts=[]; if(isSuper()) opts.push({id:'own',label:'Our own'});
+    CLIENTS.forEach(function(c){ opts.push({id:c.id,label:clientLabel(c)}); });
+    if(SESSION && opts.length>1){
+      var all=document.createElement('button'); all.type='button'; all.className='ochip'+(ownerFilter.length?'':' on'); all.textContent='All';
+      all.onclick=function(){ ownerFilter=[]; renderScope(); loadLibrary(); }; ownChips.appendChild(all);
+      opts.forEach(function(o){
+        var on=ownerFilter.indexOf(o.id)>-1, b=document.createElement('button');
+        b.type='button'; b.className='ochip'+(on?' on':''); b.textContent=o.label;
+        b.onclick=function(){ ownerFilter = on ? ownerFilter.filter(function(x){return x!==o.id;}) : ownerFilter.concat([o.id]);
+          renderScope(); loadLibrary(); };
+        ownChips.appendChild(b);
+      });
+    } else ownerFilter=[];
+    updateGo();
+  }
+  forSel.addEventListener('change', updateGo);
 
   go.addEventListener('click', async function(){
     go.disabled=true;
     for (var i=0;i<queue.length;i++){ await processOne(queue[i]); }
-    go.disabled=false;
+    updateGo();
     loadLibrary();
   });
 
   // ---- library panel ----
   async function loadLibrary(){
     var q = (libSearch && libSearch.value || '').trim();
+    if(!SESSION){ libgrid.innerHTML='<div class="libempty">Log in to see your translation library.</div>'; libCount.textContent='\u2014'; return; }
     try{
-      var body={company_id:COMPANY_ID};
+      var body={session:sid()};
       if(q) body.q=q;
+      if(ownerFilter.length) body.owners=ownerFilter;
       var rows=await postJSON(EP.library, body);
       var list=Array.isArray(rows)?rows:(rows.items||[]);
       // Count reflects the current view; only label as total when unfiltered.
@@ -388,6 +534,7 @@
         var meta=document.createElement('div'); meta.className='meta';
         var when=r.created_at?new Date(r.created_at).toLocaleDateString():'';
         meta.textContent=[r.source_filename, (r.target_lang||'')+' \u00b7 '+cap(r.register||''), when].filter(Boolean).join('  \u2014  ');
+        if(r.owner_name){ var ow=document.createElement('span'); ow.className='owner'; ow.textContent=r.owner_name+'  \u2014  '; meta.insertBefore(ow, meta.firstChild); }
         left.appendChild(d); left.appendChild(meta);
         if(Array.isArray(r.tags)&&r.tags.length){
           var tg=document.createElement('div'); tg.className='tags';
@@ -400,9 +547,9 @@
         var dl=document.createElement('button'); dl.className='dl'; dl.textContent='Download';
         dl.onclick=async function(){
           dl.textContent='\u2026';
-          try{ var blob=await postForBlob(EP.fetch,{company_id:COMPANY_ID,translation_id:r.translation_id});
+          try{ var blob=await postForBlob(EP.fetch,{session:sid(),translation_id:r.translation_id});
             download(blob,(r.source_filename||'document').replace(/\.docx$/i,'')+'_'+(LANG_CODE[r.target_lang]||'TR')+'.docx');
-          }catch(e){} dl.textContent='Download';
+          }catch(e){ alert('Download failed: '+(e.message||'server error')); } dl.textContent='Download';
         };
 
         var del=document.createElement('button'); del.className='del'; del.textContent='Delete';
@@ -411,7 +558,7 @@
           if(!confirm('Remove \u201c'+label+'\u201d from the library? This can be restored by an administrator.')) return;
           del.textContent='\u2026'; del.disabled=true; dl.disabled=true;
           try{
-            var res=await postJSON(EP.del,{company_id:COMPANY_ID,translation_id:r.translation_id});
+            var res=await postJSON(EP.del,{session:sid(),translation_id:r.translation_id});
             if(res && res.deleted){ row.remove(); adjustCount(-1); }
             else { del.textContent='Delete'; del.disabled=false; dl.disabled=false; alert('Could not remove that document.'); }
           }catch(e){ del.textContent='Delete'; del.disabled=false; dl.disabled=false; alert('Delete failed: '+(e.message||'server error')); }
@@ -421,7 +568,7 @@
         row.appendChild(left); row.appendChild(acts); libgrid.appendChild(row);
       });
     }catch(err){
-      libgrid.innerHTML='<div class="libempty">Library will appear here once the browse endpoint is live.</div>';
+      libgrid.innerHTML='<div class="libempty">Couldn\u2019t load the library'+(err&&err.message?' ('+escHtml(err.message)+')':'')+'.</div>';
       libCount.textContent='\u2014';
     }
   }
@@ -450,7 +597,8 @@
   // keyboard: Enter/Space on the drop zone opens the file picker
   drop.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); fileInput.click(); } });
 
-  loadLibrary();
+  paintAuth();
+  (async function(){ await loadScope(); loadLibrary(); if(!SESSION) openLogin(); })();
 </script>
 </body>
 </html>
