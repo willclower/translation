@@ -62,6 +62,9 @@
   .frow .st.busy{color:var(--sb-primary)}
   .frow .x{color:var(--sb-subtle);cursor:pointer;font-size:16px;line-height:1}
 
+  .catrow{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  @media(max-width:520px){.catrow{grid-template-columns:1fr}}
+  .tag.cat{color:#fff;background:var(--sb-primary)}
   select{width:100%;height:42px;padding:0 36px 0 12px;border:1.5px solid var(--sb-border);border-radius:var(--sb-r-input);font:inherit;font-size:13.5px;
     color:var(--sb-ink);background:#fff;appearance:none;
     background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath fill='%236b7f88' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
@@ -212,6 +215,14 @@
       <div class="files" id="files"></div>
     </div>
     <div class="field">
+      <label class="fl" for="cat">Kind of document</label>
+      <div class="catrow">
+        <select id="cat"><option value="">Choose one&hellip;</option></select>
+        <select id="sub" disabled><option value="">Type (optional)</option></select>
+      </div>
+      <div class="hint">Used in your usage reports. Applies to every file in this batch.</div>
+    </div>
+    <div class="field">
       <label class="fl" for="lang">Translate into</label>
       <select id="lang">
         <option value="Spanish" selected>Spanish</option>
@@ -281,6 +292,31 @@
   const libSearch = document.getElementById('libSearch');
   const libClear = document.getElementById('libClear');
   let register = 'business';
+  // Kinds of document (keys are stored; labels are shown). Same list as Reports / Report Builder.
+  const CATS = [
+    { k:'admin_hr',   l:'Admin & HR', subs:[['policies','HR policies & handbooks'],['benefits','Benefits & open enrollment'],['onboarding','Onboarding'],['forms','Forms & applications'],['notices','Notices & memos']] },
+    { k:'safety',     l:'Safety & compliance', subs:[['procedures','Safety procedures'],['training','Safety training / toolbox talks'],['postings','Required postings'],['incident','Incident & injury reporting'],['emergency','Emergency & evacuation']] },
+    { k:'clinical',   l:'Clinical & occupational health', subs:[['patient_instructions','Patient instructions'],['exams','Exams & screenings'],['consent','Consent & medical forms'],['vaccines','Vaccines & clinics'],['return_to_work','Injury care & return to work']] },
+    { k:'engagement', l:'Engagement', subs:[['newsletter','Newsletter'],['screen','Screen'],['flyer','Flyer / poster'],['challenge','Challenge or campaign'],['event','Event invite or announcement']] },
+    { k:'other',      l:'Other', subs:[] }
+  ];
+  const catSel = document.getElementById('cat'), subSel = document.getElementById('sub');
+  CATS.forEach(function(c){ var o=document.createElement('option'); o.value=c.k; o.textContent=c.l; catSel.appendChild(o); });
+  catSel.addEventListener('change', function(){
+    var c=CATS.find(function(x){return x.k===catSel.value;});
+    subSel.innerHTML='<option value="">Type (optional)</option>';
+    (c?c.subs:[]).forEach(function(s){ var o=document.createElement('option'); o.value=s[0]; o.textContent=s[1]; subSel.appendChild(o); });
+    subSel.disabled = !(c && c.subs.length);
+    updateGo();
+  });
+  function catLabel(k){ var c=CATS.find(function(x){return x.k===k;}); return c?c.l:''; }
+  function catPayload(){ return { category: catSel.value || '', subcategory: subSel.value || '' }; }
+  // Translate is on only when logged in, someone is chosen, files are queued and a kind is picked.
+  // (Restored: this function was lost in the 2026-10-01 "remove login modal" change.)
+  function updateGo(){
+    var ready = !!SESSION && selectedOwners().length > 0 && !!catSel.value;
+    go.disabled = queue.length===0 || !ready;
+  }
   let queue = []; // {file, id, statusEl}
 
   segs.addEventListener('click', function(e){
@@ -375,14 +411,14 @@
     for(var i=1;i<owners.length;i++){
       setStatus(q,'busy','saving to library '+(i+1)+' of '+owners.length+'\u2026');
       try{
-        var chk=await postJSON(EP.check,{session:sid(),for_client:owners[i],source_sha256:res.hash,target_lang:lang,register:register});
+        var chk=await postJSON(EP.check,Object.assign({session:sid(),for_client:owners[i],source_sha256:res.hash,target_lang:lang,register:register},catPayload()));
         if(!(chk && chk.hit)){
-          await postJSON(EP.store,{
+          await postJSON(EP.store,Object.assign(catPayload(),{
             session:sid(),for_client:owners[i],source_filename:f.name,
             source_sha256:res.hash,source_lang:SOURCE_LANG,target_lang:lang,register:register,
             glossary_version:GLOSSARY_VERSION,string_count:res.count||null,
             strings_sample:res.sample||[],source_b64:res.srcB64,translated_b64:res.outB64
-          });
+          }));
         }
         saved++;
       }catch(e){}
@@ -398,7 +434,7 @@
       var hash=await sha256hex(srcBuf);
 
       setStatus(q,'busy','checking library\u2026');
-      var chk=await postJSON(EP.check,{session:sid(),for_client:owner,source_sha256:hash,target_lang:lang,register:register});
+      var chk=await postJSON(EP.check,Object.assign({session:sid(),for_client:owner,source_sha256:hash,target_lang:lang,register:register},catPayload()));
       if (chk && chk.hit){
         setStatus(q,'busy','reusing saved\u2026');
         var blob=await postForBlob(EP.fetch,{session:sid(),translation_id:chk.translation_id});
@@ -424,12 +460,12 @@
 
       setStatus(q,'busy','saving to library\u2026');
       var srcB64=bufToB64(srcBuf), outB64=await blobToB64(blob);
-      await postJSON(EP.store,{
+      await postJSON(EP.store,Object.assign(catPayload(),{
         session:sid(),for_client:owner,source_filename:f.name,
         source_sha256:hash,source_lang:SOURCE_LANG,target_lang:lang,register:register,
         glossary_version:GLOSSARY_VERSION,string_count:ex.strings.length,
         strings_sample:ex.strings.slice(0,25),source_b64:srcB64,translated_b64:outB64
-      });
+      }));
       setStatus(q,'done','translated \u2193');
       return { hash:hash, label:'translated \u2193', srcB64:srcB64, outB64:outB64,
                count:ex.strings.length, sample:ex.strings.slice(0,25) };
@@ -591,9 +627,10 @@
         meta.textContent=[r.source_filename, (r.target_lang||'')+' \u00b7 '+cap(r.register||''), when].filter(Boolean).join('  \u2014  ');
         if(r.owner_name){ var ow=document.createElement('span'); ow.className='owner'; ow.textContent=r.owner_name+'  \u2014  '; meta.insertBefore(ow, meta.firstChild); }
         left.appendChild(d); left.appendChild(meta);
-        if(Array.isArray(r.tags)&&r.tags.length){
+        if(r.category || (Array.isArray(r.tags)&&r.tags.length)){
           var tg=document.createElement('div'); tg.className='tags';
-          r.tags.forEach(function(t){var s=document.createElement('span');s.className='tag';s.textContent=t;tg.appendChild(s);});
+          if(r.category){ var cs=document.createElement('span'); cs.className='tag cat'; cs.textContent=catLabel(r.category); tg.appendChild(cs); }
+          (r.tags||[]).forEach(function(t){var s=document.createElement('span');s.className='tag';s.textContent=t;tg.appendChild(s);});
           left.appendChild(tg);
         }
 
