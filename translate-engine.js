@@ -13,7 +13,7 @@
  */
 (function (root) {
   'use strict';
-  var ENGINE_VERSION = 'engine-v3';
+  var ENGINE_VERSION = 'engine-v4';
   var DOC_RE = /^word\/(document|header\d*|footer\d*)\.xml$/;
 
   function xmlDecode(s){return s.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,'&');}
@@ -130,7 +130,23 @@
   function countChar(s,c){ return s.split(c).length-1; }
   function noUrls(s){ return s.replace(/https?:\/\/\S+|www\.\S+|\S+@\S+\.\S+/g,' '); }
 
-  function checkUnit(unit, text, lang){
+  // House rules (table translation_rules, returned by translate-doc). Bad regexes are skipped, never fatal.
+  var RX_CACHE={};
+  function rx(src){ if(!src) return null; if(RX_CACHE[src]!==undefined) return RX_CACHE[src];
+    try{ RX_CACHE[src]=new RegExp(src,'iu'); }catch(e){ try{ RX_CACHE[src]=new RegExp(src,'i'); }catch(e2){ RX_CACHE[src]=null; } } return RX_CACHE[src]; }
+  function ruleIssues(rules, srcT, tgtT){
+    var out=[];
+    (rules||[]).forEach(function(r){
+      if(!r||!r.instruction) return;
+      var applies = r.kind==='style' ? true : (rx(r.source_regex) ? rx(r.source_regex).test(srcT) : false);
+      if(!applies) return;
+      var bad = (rx(r.avoid_regex) && rx(r.avoid_regex).test(tgtT)) || (r.kind==='term' && rx(r.target_regex) && !rx(r.target_regex).test(tgtT));
+      if(bad) out.push('house rule: '+r.instruction);
+    });
+    return out;
+  }
+
+  function checkUnit(unit, text, lang, rules){
     var issues=[], parsed=parseUnit(unit, text);
     var src=unit.plain, tgt=parsed.texts.join('');
     var srcT=noUrls(src), tgtT=noUrls(tgt);
@@ -160,6 +176,7 @@
     if(sl>=20 && tl/sl>2.2) issues.push('much longer than the English — something may have been added');
     var fused=(tgtT.match(/[A-Za-zÀ-ÿ]{25,}/g)||[]).filter(function(w){return srcT.indexOf(w)<0;});
     if(fused.length) issues.push('possible words run together: '+fused[0]);
+    ruleIssues(rules, srcT, tgtT).forEach(function(x){ if(issues.indexOf(x)<0) issues.push(x); });
     return {issues:issues, parsed:parsed};
   }
 
@@ -238,7 +255,8 @@
     var tr=await post({mode:'paragraph', language:lang, register:register, strings:send});
     var out=(tr&&tr.translated)||tr;
     if(!Array.isArray(out)||out.length!==send.length) throw new Error('translation mismatch');
-    var results=out.map(function(t,i){ var c=checkUnit(units[i], t, lang); return {text:t, issues:c.issues, parsed:c.parsed}; });
+    var rules=(tr&&Array.isArray(tr.rules))?tr.rules:[];
+    var results=out.map(function(t,i){ var c=checkUnit(units[i], t, lang, rules); return {text:t, issues:c.issues, parsed:c.parsed}; });
     var redo=[]; results.forEach(function(r,i){ if(r.issues.length) redo.push(i); });
     if(redo.length){
       if(onStatus) onStatus('rechecking '+redo.length+'\u2026');
@@ -248,14 +266,14 @@
       var out2=(tr2&&tr2.translated)||tr2;
       if(Array.isArray(out2) && out2.length===redo.length){
         redo.forEach(function(i,j){
-          var c=checkUnit(units[i], out2[j], lang);
+          var c=checkUnit(units[i], out2[j], lang, rules);
           if(c.issues.length < results[i].issues.length) results[i]={text:out2[j], issues:c.issues, parsed:c.parsed, retried:true};
           else results[i].retried=true;
         });
       }
     }
     var flagged=results.filter(function(r){return r.issues.length;}).length;
-    return {results:results, flagged:flagged, retried:redo.length};
+    return {results:results, flagged:flagged, retried:redo.length, rules:rules};
   }
 
   // ---------- second opinion (translate-review) ----------
@@ -265,12 +283,12 @@
   //  a suggestion that fails the checks is not applied and gets a comment.
   async function reviewChecked(units, run, lang, register, post){
     var items=units.map(function(u,i){ return {i:i, source:u.send, translation:run.results[i].text}; });
-    var res; try{ res=await post({language:lang, register:register, items:items}); }catch(e){ return {ok:false, applied:0, error:e.message}; }
+    var res; try{ res=await post({language:lang, register:register, items:items, rules:(run.rules||[]).map(function(r){return r.instruction;})}); }catch(e){ return {ok:false, applied:0, error:e.message}; }
     var list=(res&&res.reviews)||[], applied=0, changes=[];
     list.forEach(function(rv){
       var i=rv.i, r=run.results[i]; if(!r || typeof rv.corrected!=='string') return;
       if(rv.corrected.trim()===String(r.text).trim()) return;
-      var c=checkUnit(units[i], rv.corrected, lang);
+      var c=checkUnit(units[i], rv.corrected, lang, run.rules);
       var why=(rv.kind||'style')+': '+(rv.problem||'');
       if(c.issues.length<=r.issues.length){
         r.text=rv.corrected; r.parsed=c.parsed; r.issues=c.issues; r.reviewed=why; applied++;
