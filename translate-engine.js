@@ -13,7 +13,7 @@
  */
 (function (root) {
   'use strict';
-  var ENGINE_VERSION = 'engine-v2';
+  var ENGINE_VERSION = 'engine-v2b';
   var DOC_RE = /^word\/(document|header\d*|footer\d*)\.xml$/;
 
   function xmlDecode(s){return s.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,'&');}
@@ -137,6 +137,10 @@
     if(!parsed.ok) issues.push('formatting/link markers came back broken — formatting in this paragraph may be off');
     else if(parsed.moved) issues.push('formatting or link may sit on the wrong words (the sentence order changed)');
     if(parsed.ok && unit.marked){
+      parsed.texts.forEach(function(t,i){ // link text much shorter or longer than its English = likely on the wrong words
+        var sp=unit.spans[i], st=sp.text.trim(), tt=t.trim();
+        if(!/\|h$/.test(sp.key) && tt && st.length>=12 && (tt.length/st.length<0.55 || tt.length/st.length>2.2))
+          issues.push('the link may be on the wrong words ("'+tt.slice(0,40)+'" for "'+st.slice(0,40)+'")'); });
       parsed.texts.forEach(function(t,i){ if(!t.trim()) issues.push('the '+(/\|h$/.test(unit.spans[i].key)?'formatted':'link')+' text "'+unit.spans[i].text.trim().slice(0,40)+'" came back empty'); });
     }
     var words=(srcT.match(/[A-Za-z]+/g)||[]);
@@ -149,6 +153,7 @@
     if(bb.length) issues.push('new number(s) not in the English: '+bb.slice(0,4).join(', '));
     ['$','%'].forEach(function(c){ if(countChar(srcT,c)!==countChar(tgtT,c)) issues.push('"'+c+'" count differs from the English'); });
     if(METRIC_T.test(tgtT) && !METRIC_S.test(srcT)) issues.push('converted to metric — keep US units');
+    if(/^spanish/i.test(lang||'') && /\b(pounds?|ounces?|miles|inch(es)?|feet)\b/i.test(tgtT)) issues.push('English unit word left in (write libras, onzas, millas, pulgadas, pies)');
     if(/^spanish/i.test(lang||'')) US_UNITS_ES.forEach(function(u){ if(u[0].test(srcT) && !u[1].test(tgtT)) issues.push(u[2]+' missing'); });
     var sl=src.trim().length, tl=tgt.trim().length;
     if(ROMANCE.test(lang||'') && sl>=40 && tl/sl<0.8) issues.push('much shorter than the English — something may be missing');
