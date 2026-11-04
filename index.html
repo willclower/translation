@@ -56,8 +56,9 @@
   .files.show{display:flex}
   .frow{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--sb-border);border-radius:var(--sb-r-input);
     background:#fff;font-size:13px}
-  .frow .nm{font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .frow .st{font-size:12px;color:var(--sb-subtle);white-space:nowrap}
+  .frow{flex-wrap:wrap}
+  .frow .nm{font-weight:600;flex:1 1 120px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .frow .st{font-size:12px;color:var(--sb-subtle);flex:1 1 100%;order:3;line-height:1.4}  /* status on its own line under the name, wraps */
   .frow .st.hit,.frow .st.done{color:var(--ok)}
   .frow .st.err{color:var(--err)}
   .frow .st.warn{color:#b8660b}
