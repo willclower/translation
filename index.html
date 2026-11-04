@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Document Translation</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="translate-engine.js?v=2"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="../wellness_tools/studio-brand.css">
@@ -59,6 +60,7 @@
   .frow .st{font-size:12px;color:var(--sb-subtle);white-space:nowrap}
   .frow .st.hit,.frow .st.done{color:var(--ok)}
   .frow .st.err{color:var(--err)}
+  .frow .st.warn{color:#b8660b}
   .frow .st.busy{color:var(--sb-primary)}
   .frow .x{color:var(--sb-subtle);cursor:pointer;font-size:16px;line-height:1}
 
@@ -277,6 +279,8 @@
   let SESSION = StudioAuth.require('translation');   // { session, am:{ id, name, is_super_admin, tools } }
   const SOURCE_LANG = "English";
   const GLOSSARY_VERSION = null;
+  // Flagged paragraphs get a Word comment ("MedWell translation check") in the downloaded and stored file.
+  const FLAG_COMMENTS = true;
   // ==================
 
   const LANG_CODE = { 'Spanish':'ES','French':'FR','Portuguese':'PT','Vietnamese':'VI','Chinese (Simplified)':'ZH' };
@@ -371,6 +375,7 @@
   }
   async function blobToB64(blob){ return bufToB64(await blob.arrayBuffer()); }
 
+  // Old fragment extract/rebuild — no longer called (engine-v2 in translate-engine.js). Kept for one release.
   async function extract(zip){
     var strings=[],parts={},g=0;
     var names=Object.keys(zip.files).filter(function(n){return DOC_RE.test(n);});
@@ -446,29 +451,33 @@
 
       setStatus(q,'busy','reading\u2026');
       var zip=await JSZip.loadAsync(srcBuf);
-      var ex=await extract(zip);
-      if(!ex.strings.length) throw new Error('no text found');
+      var ex=await TranslateEngine.extractUnits(zip);   // one unit per paragraph (engine-v2)
+      if(!ex.units.length) throw new Error('no text found');
 
-      setStatus(q,'busy','translating '+ex.strings.length+'\u2026');
-      var tr=await postJSON(EP.translate,{language:lang,register:register,strings:ex.strings});
-      var translated=(tr&&tr.translated)||tr;
-      if(!Array.isArray(translated)||translated.length!==ex.strings.length) throw new Error('translation mismatch');
+      setStatus(q,'busy','translating '+ex.units.length+' paragraphs\u2026');
+      var run=await TranslateEngine.translateChecked(ex.units, lang, register,
+        function(b){ return postJSON(EP.translate,b); },
+        function(t){ setStatus(q,'busy',t); });
 
       setStatus(q,'busy','rebuilding\u2026');
-      var blob=await rebuild(zip,ex.parts,translated);
+      var blob=await TranslateEngine.rebuildDoc(zip,ex.parts,ex.units,run.results,{comments:FLAG_COMMENTS});
       download(blob, outName(f.name,lang));
+      var doneLbl = run.flagged ? 'translated \u2193 \u00b7 '+run.flagged+' flagged for review (comments in the file)' : 'translated \u2193 \u00b7 checks passed';
+      var flagList = run.results.map(function(r,i){ return r.issues.length ? '\u2022 '+TranslateEngine.stripMarkers(ex.units[i].send).slice(0,60)+'\u2026 \u2014 '+r.issues.join('; ') : null; }).filter(Boolean).join('\n');
+      var sample = ex.units.slice(0,25).map(function(u){ return TranslateEngine.stripMarkers(u.send); });
 
       setStatus(q,'busy','saving to library\u2026');
       var srcB64=bufToB64(srcBuf), outB64=await blobToB64(blob);
       await postJSON(EP.store,Object.assign(catPayload(),{
         session:sid(),for_client:owner,source_filename:f.name,
         source_sha256:hash,source_lang:SOURCE_LANG,target_lang:lang,register:register,
-        glossary_version:GLOSSARY_VERSION,string_count:ex.strings.length,
-        strings_sample:ex.strings.slice(0,25),source_b64:srcB64,translated_b64:outB64
+        glossary_version:GLOSSARY_VERSION,string_count:ex.units.length,
+        strings_sample:sample,source_b64:srcB64,translated_b64:outB64
       }));
-      setStatus(q,'done','translated \u2193');
-      return { hash:hash, label:'translated \u2193', srcB64:srcB64, outB64:outB64,
-               count:ex.strings.length, sample:ex.strings.slice(0,25) };
+      setStatus(q, run.flagged?'warn':'done', doneLbl);
+      if(q.statusEl) q.statusEl.title = flagList;
+      return { hash:hash, label:doneLbl, srcB64:srcB64, outB64:outB64,
+               count:ex.units.length, sample:sample };
     }catch(err){
       setStatus(q,'err', err.message||'failed');
       return null;
