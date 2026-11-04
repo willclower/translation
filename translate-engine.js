@@ -13,7 +13,7 @@
  */
 (function (root) {
   'use strict';
-  var ENGINE_VERSION = 'engine-v2b';
+  var ENGINE_VERSION = 'engine-v3';
   var DOC_RE = /^word\/(document|header\d*|footer\d*)\.xml$/;
 
   function xmlDecode(s){return s.replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,'&');}
@@ -181,8 +181,9 @@
                       ins:'<w:t xml:space="preserve">'+(k===0?xmlEncode(t):'')});
         });
       });
-      if(flagFor && r.issues.length && u.para.depth===0 && u.para.closeAt>0){
-        var id=flagFor(r.issues), at=u.para.openEnd;
+      var flags=(r.issues||[]).concat(r.notes||[]);
+      if(flagFor && flags.length && u.para.depth===0 && u.para.closeAt>0){
+        var id=flagFor(flags), at=u.para.openEnd;
         if(xml.startsWith('<w:pPr',at)){ var e=xml.indexOf('</w:pPr>',at), sc=xml.indexOf('/>',at), gt=xml.indexOf('>',at);
           at = (sc>=0 && sc+1===gt) ? gt+1 : e+8; }
         edits.push({at:at, del:0, ins:'<w:commentRangeStart w:id="'+id+'"/>'});
@@ -209,7 +210,7 @@
       var name=names[k], us=[], rs=[];
       units.forEach(function(u,i){ if(u.part===name){ us.push(u); rs.push(results[i]); } });
       var flagFor = (opts.comments && name==='word/document.xml') ? function(issues){
-        var id=nextId++; comments.push({id:id, text:'Translation check: '+issues.join('; ')+'.'}); return id; } : null;
+        var id=nextId++; comments.push({id:id, text:'Translation check: '+issues.join('; ').replace(/\.$/,'')+'.'}); return id; } : null;
       zip.file(name, rebuildXml(parts[name], us, rs, flagFor));
     }
     if(comments.length) await addComments(zip, comments);
@@ -257,7 +258,33 @@
     return {results:results, flagged:flagged, retried:redo.length};
   }
 
+  // ---------- second opinion (translate-review) ----------
+  // A second model returns only paragraphs needing a change. Code re-checks every suggestion:
+  //  grammar/style fixes that pass the checks are applied quietly (listed on the status line);
+  //  meaning fixes are applied AND get a comment so a person confirms;
+  //  a suggestion that fails the checks is not applied and gets a comment.
+  async function reviewChecked(units, run, lang, register, post){
+    var items=units.map(function(u,i){ return {i:i, source:u.send, translation:run.results[i].text}; });
+    var res; try{ res=await post({language:lang, register:register, items:items}); }catch(e){ return {ok:false, applied:0, error:e.message}; }
+    var list=(res&&res.reviews)||[], applied=0, changes=[];
+    list.forEach(function(rv){
+      var i=rv.i, r=run.results[i]; if(!r || typeof rv.corrected!=='string') return;
+      if(rv.corrected.trim()===String(r.text).trim()) return;
+      var c=checkUnit(units[i], rv.corrected, lang);
+      var why=(rv.kind||'style')+': '+(rv.problem||'');
+      if(c.issues.length<=r.issues.length){
+        r.text=rv.corrected; r.parsed=c.parsed; r.issues=c.issues; r.reviewed=why; applied++;
+        changes.push(i);
+        if(rv.kind==='meaning'){ r.notes=(r.notes||[]).concat(['review changed the meaning-related wording, please confirm ('+rv.problem+')']); }
+      } else {
+        r.notes=(r.notes||[]).concat(['review suggests a change that failed the checks, not applied ('+rv.problem+') — suggested: '+stripMarkers(rv.corrected).slice(0,200)]);
+      }
+    });
+    run.flagged=run.results.filter(function(r){ return r.issues.length || (r.notes&&r.notes.length); }).length;
+    return {ok:!(res&&res.failed_batches&&res.failed_batches.length), applied:applied, changes:changes};
+  }
+
   var api={ENGINE_VERSION:ENGINE_VERSION, extractUnits:extractUnits, parseUnit:parseUnit, checkUnit:checkUnit,
-           rebuildDoc:rebuildDoc, translateChecked:translateChecked, stripMarkers:stripMarkers};
+           rebuildDoc:rebuildDoc, translateChecked:translateChecked, reviewChecked:reviewChecked, stripMarkers:stripMarkers};
   if(typeof module!=='undefined' && module.exports) module.exports=api; else root.TranslateEngine=api;
 })(this);
